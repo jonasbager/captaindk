@@ -18,7 +18,7 @@ interface Integration {
 
 const baseIntegrations: Integration[] = [
   { id: "gmail", name: "Gmail", description: "Automatisk scanning af kvitteringer i din Gmail-indbakke", icon: Mail, status: "ikke-forbundet", provider: "gmail" },
-  { id: "outlook", name: "Microsoft 365 / Outlook", description: "Find kvitteringer og fakturaer i Outlook automatisk", icon: Mail, status: "kommer-snart" },
+  { id: "outlook", name: "Microsoft 365 / Outlook", description: "Find kvitteringer og fakturaer i Outlook automatisk", icon: Mail, status: "ikke-forbundet", provider: "outlook" },
   { id: "aiia", name: "Bank (Aiia/PSD2)", description: "Automatisk import af banktransaktioner fra din bank", icon: CreditCard, status: "kommer-snart" },
   { id: "pleo", name: "Pleo", description: "CSV-import nu, API-integration i v2", icon: Receipt, status: "ikke-forbundet" },
   { id: "booksmate", name: "Booksmate", description: "Del dit regnskab direkte med din revisor", icon: Plug, status: "kommer-snart" },
@@ -36,84 +36,79 @@ export default function Integrationer() {
   const { session } = useAuth();
   const [integrations, setIntegrations] = useState<Integration[]>(baseIntegrations);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
+  const [scanning, setScanning] = useState<string | null>(null);
 
-  // Check for connected providers
-  useEffect(() => {
+  const refreshConnections = async () => {
     if (!session?.user) return;
+    const { data } = await supabase
+      .from("email_connections")
+      .select("provider")
+      .eq("user_id", session.user.id);
 
-    const checkConnections = async () => {
-      const { data } = await supabase
-        .from("email_connections")
-        .select("provider")
-        .eq("user_id", session.user.id);
+    if (data) {
+      const connectedProviders = data.map((c) => c.provider);
+      setIntegrations((prev) =>
+        prev.map((int) =>
+          int.provider && connectedProviders.includes(int.provider)
+            ? { ...int, status: "forbundet" }
+            : int
+        )
+      );
+    }
+  };
 
-      if (data) {
-        const connectedProviders = data.map((c) => c.provider);
-        setIntegrations((prev) =>
-          prev.map((int) =>
-            int.provider && connectedProviders.includes(int.provider)
-              ? { ...int, status: "forbundet" }
-              : int
-          )
-        );
-      }
-    };
-
-    checkConnections();
+  useEffect(() => {
+    refreshConnections();
   }, [session]);
 
   // Check URL params for callback result
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
     const gmailStatus = params.get("gmail");
+    const outlookStatus = params.get("outlook");
+
     if (gmailStatus === "success") {
       toast({ title: "Gmail forbundet", description: "Din Gmail-konto er nu forbundet til Captain." });
       window.history.replaceState({}, "", window.location.pathname);
-      // Re-check connections
-      if (session?.user) {
-        supabase
-          .from("email_connections")
-          .select("provider")
-          .eq("user_id", session.user.id)
-          .then(({ data }) => {
-            if (data) {
-              const connectedProviders = data.map((c) => c.provider);
-              setIntegrations((prev) =>
-                prev.map((int) =>
-                  int.provider && connectedProviders.includes(int.provider)
-                    ? { ...int, status: "forbundet" }
-                    : int
-                )
-              );
-            }
-          });
-      }
+      refreshConnections();
     } else if (gmailStatus === "error") {
       toast({ title: "Fejl", description: "Kunne ikke forbinde Gmail. Prøv igen.", variant: "destructive" });
       window.history.replaceState({}, "", window.location.pathname);
     }
+
+    if (outlookStatus === "success") {
+      toast({ title: "Outlook forbundet", description: "Din Microsoft-konto er nu forbundet til Captain." });
+      window.history.replaceState({}, "", window.location.pathname);
+      refreshConnections();
+    } else if (outlookStatus === "error") {
+      const reason = params.get("reason") || "";
+      toast({ title: "Fejl", description: `Kunne ikke forbinde Outlook. ${reason}`, variant: "destructive" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
 
-  const connectGmail = async () => {
+  const connectProvider = async (provider: "gmail" | "outlook") => {
     if (!session) return;
-    setConnecting("gmail");
+    setConnecting(provider);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-auth");
+      const fnName = provider === "gmail" ? "gmail-auth" : "outlook-auth";
+      const { data, error } = await supabase.functions.invoke(fnName);
       if (error) throw error;
       if (data?.url) {
         window.location.href = data.url;
       }
     } catch (err: any) {
-      toast({ title: "Fejl", description: err.message || "Kunne ikke starte Gmail-forbindelse", variant: "destructive" });
+      toast({ title: "Fejl", description: err.message || `Kunne ikke starte ${provider}-forbindelse`, variant: "destructive" });
       setConnecting(null);
     }
   };
 
-  const scanInbox = async () => {
-    setScanning(true);
+  const scanProvider = async (provider: "gmail" | "outlook") => {
+    setScanning(provider);
     try {
-      const { data, error } = await supabase.functions.invoke("scan-inbox");
+      const fnName = provider === "gmail" ? "scan-inbox" : "scan-outlook";
+      const { data, error } = await supabase.functions.invoke(fnName);
       if (error) throw error;
       toast({
         title: "Scanning fuldført",
@@ -122,7 +117,7 @@ export default function Integrationer() {
     } catch (err: any) {
       toast({ title: "Fejl", description: err.message || "Scanning fejlede", variant: "destructive" });
     } finally {
-      setScanning(false);
+      setScanning(null);
     }
   };
 
@@ -152,17 +147,33 @@ export default function Integrationer() {
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mb-3">{int.description}</p>
+
+              {/* Gmail actions */}
               {int.id === "gmail" && int.status === "ikke-forbundet" && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={connectGmail} disabled={connecting === "gmail"}>
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => connectProvider("gmail")} disabled={connecting === "gmail"}>
                   {connecting === "gmail" ? <><Loader2 className="h-3 w-3 animate-spin" /> Forbinder...</> : "Forbind Gmail"}
                 </Button>
               )}
               {int.id === "gmail" && int.status === "forbundet" && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={scanInbox} disabled={scanning}>
-                  {scanning ? <><Loader2 className="h-3 w-3 animate-spin" /> Scanner...</> : "Scan indbakke nu"}
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => scanProvider("gmail")} disabled={scanning === "gmail"}>
+                  {scanning === "gmail" ? <><Loader2 className="h-3 w-3 animate-spin" /> Scanner...</> : "Scan indbakke nu"}
                 </Button>
               )}
-              {int.id !== "gmail" && int.status === "ikke-forbundet" && (
+
+              {/* Outlook actions */}
+              {int.id === "outlook" && int.status === "ikke-forbundet" && (
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => connectProvider("outlook")} disabled={connecting === "outlook"}>
+                  {connecting === "outlook" ? <><Loader2 className="h-3 w-3 animate-spin" /> Forbinder...</> : "Forbind Outlook"}
+                </Button>
+              )}
+              {int.id === "outlook" && int.status === "forbundet" && (
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => scanProvider("outlook")} disabled={scanning === "outlook"}>
+                  {scanning === "outlook" ? <><Loader2 className="h-3 w-3 animate-spin" /> Scanner...</> : "Scan indbakke nu"}
+                </Button>
+              )}
+
+              {/* Other integrations */}
+              {!["gmail", "outlook"].includes(int.id) && int.status === "ikke-forbundet" && (
                 <Button size="sm" variant="outline" className="text-xs">Forbind</Button>
               )}
               {int.status === "kommer-snart" && (
