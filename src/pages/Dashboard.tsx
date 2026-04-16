@@ -1,8 +1,11 @@
 import { motion } from "framer-motion";
-import { ArrowRight, FileWarning, CreditCard, Sparkles } from "lucide-react";
+import { ArrowRight, FileWarning, CreditCard, Sparkles, Inbox } from "lucide-react";
 import { Link } from "react-router-dom";
-import { company, kpiData, inboxCounts, recentEntries, formatAmountShort, formatAmount } from "@/lib/demo-data";
+import { useCompany } from "@/hooks/useCompany";
+import { formatAmountShort, formatAmount } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 const fadeIn = (delay: number) => ({
   initial: { opacity: 0, y: 8 },
@@ -16,39 +19,90 @@ const statusColors: Record<string, string> = {
   afventer: "bg-warning/15 text-warning border-warning/20",
 };
 
+interface JournalEntry {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  account: string;
+  account_number: number | null;
+  status: string;
+  has_document: boolean;
+}
+
 export default function Dashboard() {
-  const kpis = [
-    { label: "Omsætning YTD", value: kpiData.revenueYTD, positive: true },
-    { label: "Resultat YTD", value: kpiData.resultYTD, positive: true },
-    { label: "Skyldig moms", value: kpiData.vatOwed, positive: kpiData.vatOwed >= 0 },
-    { label: "Banksaldo", value: kpiData.bankBalance, positive: true },
-  ];
+  const { company } = useCompany();
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [counts, setCounts] = useState({ documents: 0, transactions: 0, suggestions: 0 });
+
+  useEffect(() => {
+    if (!company) return;
+
+    const fetchData = async () => {
+      const [entriesRes, docsRes, txRes] = await Promise.all([
+        supabase
+          .from("journal_entries")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("date", { ascending: false })
+          .limit(7),
+        supabase
+          .from("documents")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", company.id)
+          .eq("status", "pending"),
+        supabase
+          .from("transactions")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", company.id)
+          .is("matched_document_id", null),
+      ]);
+
+      if (entriesRes.data) setEntries(entriesRes.data);
+      setCounts({
+        documents: docsRes.count || 0,
+        transactions: txRes.count || 0,
+        suggestions: 0,
+      });
+    };
+
+    fetchData();
+  }, [company]);
+
+  if (!company) return null;
+
+  const fiscalYear = new Date(company.fiscal_year_start).getFullYear();
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <motion.div {...fadeIn(0)}>
         <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="text-lg font-semibold">{company.name}</h1>
-          <span className="text-xs font-mono text-muted-foreground">CVR {company.cvr}</span>
-          <span className="text-xs text-muted-foreground">· Regnskabsår {company.fiscalYear}</span>
+          {company.cvr && <span className="text-xs font-mono text-muted-foreground">CVR {company.cvr}</span>}
+          <span className="text-xs text-muted-foreground">· Regnskabsår {fiscalYear}</span>
         </div>
       </motion.div>
 
-      {/* KPI Cards — responsive */}
+      {/* KPI Cards — empty state */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {kpis.map((kpi, i) => (
+        {[
+          { label: "Omsætning YTD", value: 0 },
+          { label: "Resultat YTD", value: 0 },
+          { label: "Skyldig moms", value: 0 },
+          { label: "Banksaldo", value: 0 },
+        ].map((kpi, i) => (
           <motion.div key={kpi.label} {...fadeIn(0.05 * (i + 1))}
             className="border border-border/50 rounded bg-card p-4"
           >
             <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
-            <p className={`text-xl font-mono font-semibold ${kpi.positive ? "text-primary" : "text-destructive"}`}>
+            <p className="text-xl font-mono font-semibold text-muted-foreground">
               {formatAmountShort(kpi.value)}
             </p>
           </motion.div>
         ))}
       </div>
 
-      {/* Indbakke section — responsive */}
+      {/* Indbakke section */}
       <motion.div {...fadeIn(0.25)} className="border border-border/50 rounded bg-card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold">Indbakke</h2>
@@ -56,68 +110,86 @@ export default function Dashboard() {
             Åbn indbakke <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
-            <FileWarning className="h-4 w-4 text-warning" />
-            <div>
-              <p className="text-2xl font-mono font-semibold">{inboxCounts.unmatchedDocuments}</p>
-              <p className="text-xs text-muted-foreground">Bilag uden match</p>
-            </div>
-          </Link>
-          <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
-            <CreditCard className="h-4 w-4 text-destructive" />
-            <div>
-              <p className="text-2xl font-mono font-semibold">{inboxCounts.unmatchedTransactions}</p>
-              <p className="text-xs text-muted-foreground">Transaktioner uden bilag</p>
-            </div>
-          </Link>
-          <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
-            <Sparkles className="h-4 w-4 text-info" />
-            <div>
-              <p className="text-2xl font-mono font-semibold">{inboxCounts.pendingSuggestions}</p>
-              <p className="text-xs text-muted-foreground">AI-forslag venter</p>
-            </div>
-          </Link>
-        </div>
+        {counts.documents === 0 && counts.transactions === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Inbox className="h-8 w-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm text-muted-foreground">Ingen ventende elementer</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Upload bilag eller importer transaktioner for at komme i gang</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
+              <FileWarning className="h-4 w-4 text-warning" />
+              <div>
+                <p className="text-2xl font-mono font-semibold">{counts.documents}</p>
+                <p className="text-xs text-muted-foreground">Bilag uden match</p>
+              </div>
+            </Link>
+            <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
+              <CreditCard className="h-4 w-4 text-destructive" />
+              <div>
+                <p className="text-2xl font-mono font-semibold">{counts.transactions}</p>
+                <p className="text-xs text-muted-foreground">Transaktioner uden bilag</p>
+              </div>
+            </Link>
+            <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
+              <Sparkles className="h-4 w-4 text-info" />
+              <div>
+                <p className="text-2xl font-mono font-semibold">{counts.suggestions}</p>
+                <p className="text-xs text-muted-foreground">AI-forslag venter</p>
+              </div>
+            </Link>
+          </div>
+        )}
       </motion.div>
 
-      {/* Recent entries — responsive table */}
+      {/* Recent entries */}
       <motion.div {...fadeIn(0.35)}>
         <h2 className="text-sm font-semibold mb-3">Seneste posteringer</h2>
-        <div className="border border-border/50 rounded overflow-x-auto">
-          <table className="w-full text-sm min-w-[600px]">
-            <thead>
-              <tr className="border-b border-border/30 text-xs text-muted-foreground">
-                <th className="text-left p-3 font-medium">Dato</th>
-                <th className="text-left p-3 font-medium">Beskrivelse</th>
-                <th className="text-left p-3 font-medium">Konto</th>
-                <th className="text-right p-3 font-medium">Beløb</th>
-                <th className="text-center p-3 font-medium">Status</th>
-                <th className="text-center p-3 font-medium">Bilag</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentEntries.map((entry) => (
-                <tr key={entry.id} className="border-b border-border/20 hover:bg-accent/30 transition-colors">
-                  <td className="p-3 font-mono text-xs text-muted-foreground">{entry.date}</td>
-                  <td className="p-3">{entry.description}</td>
-                  <td className="p-3 text-xs text-muted-foreground font-mono">{entry.accountNumber}</td>
-                  <td className={`p-3 text-right font-mono text-sm ${entry.amount >= 0 ? "text-primary" : "text-foreground"}`}>
-                    {formatAmount(entry.amount)}
-                  </td>
-                  <td className="p-3 text-center">
-                    <Badge variant="outline" className={`text-[10px] ${statusColors[entry.status]}`}>
-                      {entry.status}
-                    </Badge>
-                  </td>
-                  <td className="p-3 text-center">
-                    <span className={`inline-block w-2 h-2 rounded-full ${entry.hasDocument ? "bg-primary" : "bg-destructive"}`} />
-                  </td>
+        {entries.length === 0 ? (
+          <div className="border border-border/50 rounded bg-card flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">Ingen posteringer endnu</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Brug bogførings-chatten til at oprette din første postering</p>
+            <Link to="/bogfoer" className="text-xs text-primary hover:underline mt-3 flex items-center gap-1">
+              Gå til bogføring <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        ) : (
+          <div className="border border-border/50 rounded overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-border/30 text-xs text-muted-foreground">
+                  <th className="text-left p-3 font-medium">Dato</th>
+                  <th className="text-left p-3 font-medium">Beskrivelse</th>
+                  <th className="text-left p-3 font-medium">Konto</th>
+                  <th className="text-right p-3 font-medium">Beløb</th>
+                  <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-center p-3 font-medium">Bilag</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {entries.map((entry) => (
+                  <tr key={entry.id} className="border-b border-border/20 hover:bg-accent/30 transition-colors">
+                    <td className="p-3 font-mono text-xs text-muted-foreground">{entry.date}</td>
+                    <td className="p-3">{entry.description}</td>
+                    <td className="p-3 text-xs text-muted-foreground font-mono">{entry.account_number}</td>
+                    <td className={`p-3 text-right font-mono text-sm ${entry.amount >= 0 ? "text-primary" : "text-foreground"}`}>
+                      {formatAmount(entry.amount)}
+                    </td>
+                    <td className="p-3 text-center">
+                      <Badge variant="outline" className={`text-[10px] ${statusColors[entry.status] || ""}`}>
+                        {entry.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className={`inline-block w-2 h-2 rounded-full ${entry.has_document ? "bg-primary" : "bg-destructive"}`} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </motion.div>
     </div>
   );

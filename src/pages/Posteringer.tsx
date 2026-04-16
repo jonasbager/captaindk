@@ -1,27 +1,17 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Filter, FileText, Check, Trash2 } from "lucide-react";
-import { recentEntries, formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const allEntries = [
-  ...recentEntries,
-  { id: "8", date: "2026-04-03", description: "Amazon — USB-hub", amount: -799, account: "Småanskaffelser", accountNumber: 3615, status: "godkendt" as const, hasDocument: true },
-  { id: "9", date: "2026-04-01", description: "IKEA — Reol til kontor", amount: -3450, account: "Småanskaffelser", accountNumber: 3615, status: "godkendt" as const, hasDocument: true },
-  { id: "10", date: "2026-03-28", description: "Coolshop — Webcam", amount: -549, account: "Småanskaffelser", accountNumber: 3615, status: "ai-forslag" as const, hasDocument: false },
-  { id: "11", date: "2026-03-25", description: "Faktura #2026-045 — Rådgivning", amount: 32000, account: "Nettoomsætning", accountNumber: 1000, status: "godkendt" as const, hasDocument: true },
-  { id: "12", date: "2026-03-20", description: "Telia — Mobilabonnement", amount: -199, account: "Telefon", accountNumber: 3650, status: "godkendt" as const, hasDocument: true },
-  { id: "13", date: "2026-03-18", description: "Faktura #2026-044 — Webdesign", amount: 18500, account: "Nettoomsætning", accountNumber: 1000, status: "godkendt" as const, hasDocument: true },
-  { id: "14", date: "2026-03-15", description: "Logitech — Mus", amount: -499, account: "Småanskaffelser", accountNumber: 3615, status: "godkendt" as const, hasDocument: true },
-  { id: "15", date: "2026-03-10", description: "GitHub — Pro plan", amount: -73, account: "Software", accountNumber: 3630, status: "godkendt" as const, hasDocument: true },
-];
+const allEntries: any[] = [];
 
-const totalCount = 247;
-const pendingCount = allEntries.filter(e => e.status !== "godkendt").length;
+const totalCount = 0;
+const pendingCount = 0;
 
 const statusColors: Record<string, string> = {
   godkendt: "bg-primary/15 text-primary border-primary/20",

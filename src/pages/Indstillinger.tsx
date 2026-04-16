@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { company } from "@/lib/demo-data";
+import { useCompany } from "@/hooks/useCompany";
+import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Compass } from "lucide-react";
 
 export default function Indstillinger() {
+  const { company } = useCompany();
+  const { user } = useAuth();
   const [navVisible, setNavVisible] = useState(true);
   const [autoSuggest, setAutoSuggest] = useState(true);
   const [aiNotifications, setAiNotifications] = useState(true);
@@ -28,15 +31,15 @@ export default function Indstillinger() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Virksomhedsnavn</Label>
-            <Input defaultValue={company.name} className="h-8 text-sm bg-background" />
+            <Input defaultValue={company?.name || ""} className="h-8 text-sm bg-background" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">CVR-nummer</Label>
-            <Input defaultValue={company.cvr} className="h-8 text-sm bg-background font-mono" />
+            <Input defaultValue={company?.cvr || ""} className="h-8 text-sm bg-background font-mono" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Regnskabsår start</Label>
-            <Input defaultValue="2026-01-01" type="date" className="h-8 text-sm bg-background font-mono" />
+            <Input defaultValue={company?.fiscal_year_start || ""} type="date" className="h-8 text-sm bg-background font-mono" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Momsperiode</Label>
@@ -62,11 +65,11 @@ export default function Indstillinger() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Navn</Label>
-            <Input defaultValue="Jonas Bager" className="h-8 text-sm bg-background" />
+            <Input defaultValue={user?.user_metadata?.full_name || user?.user_metadata?.name || ""} className="h-8 text-sm bg-background" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Email</Label>
-            <Input defaultValue="jonas@bagerconsulting.dk" className="h-8 text-sm bg-background" />
+            <Input defaultValue={user?.email || ""} className="h-8 text-sm bg-background" readOnly />
           </div>
         </div>
       </motion.div>

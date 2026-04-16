@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Paperclip, Check, Pencil, CheckCircle } from "lucide-react";
-import { chatMessages as initialMessages, formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -96,7 +96,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 export default function Bogfoer() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(
-    initialMessages.map((m) => ({ ...m, approved: m.id === "c2" ? false : undefined }))
+    []
   );
   const scrollRef = useRef<HTMLDivElement>(null);
 

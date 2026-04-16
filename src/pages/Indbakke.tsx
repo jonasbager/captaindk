@@ -1,17 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, X, FileText, CreditCard, Sparkles, GripVertical, Anchor } from "lucide-react";
-import { unmatchedDocuments as initialDocs, unmatchedTransactions as initialTxs, matchSuggestions as initialSuggestions, formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 export default function Indbakke() {
-  const [suggestions, setSuggestions] = useState(initialSuggestions);
-  const [documents, setDocuments] = useState(initialDocs);
-  const [transactions, setTransactions] = useState(initialTxs);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [processed, setProcessed] = useState(0);
-  const total = initialSuggestions.length;
+  const total = suggestions.length;
   const [hoveredSuggestion, setHoveredSuggestion] = useState<string | null>(null);
 
   const [draggedDocId, setDraggedDocId] = useState<string | null>(null);
