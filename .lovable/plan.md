@@ -1,68 +1,39 @@
 
 
-# Bogføring — AI-first bogføringssystem
+# Status og næste skridt
 
-## Design System
-- **Dark theme default**: Background #0a0b0d, surfaces #13141a, subtle 1px borders at low opacity
-- **Typography**: Monospace (JetBrains Mono) for all numbers/amounts, DM Sans for body text
-- **Colors**: Green accent (#4ade80) for positive/confirmations, Red (#f87171) for negative/warnings, muted text for secondary info
-- **Style**: Linear/Mercury-inspired — no shadows, no rounded-everything, generous whitespace for number-heavy layouts
-- **Animations**: Subtle fade-in/slide-up on load, smooth state transitions only
+## Hvad er bygget og fungerer
+Alle 11 sider er oprettet med demo-data, navigation, tema-skifter, og det grundlæggende design-system. Appen er funktionel som prototype.
 
-## Navigation
-- Sidebar with all 11 items (Dashboard, Bogfør, Indbakke w/ badge, Bilag, Posteringer, Kontoplan, Moms, SKAT, Import, Integrationer, Indstillinger)
-- Collapsed to icons by default, expand on hover
-- Company name + CVR at bottom
+## Prioriteret rækkefølge for forbedringer
 
-## Pages to Build (Phase 1)
+### 1. Polish og UX-forbedringer på kernesiderne
+- **Indbakke**: Drag-and-drop fra kolonne 1 til kolonne 2 for manuel matching (specificeret i planen men mangler). Items bør forsvinde fra kolonne 1/2 når de godkendes i kolonne 3.
+- **Bogfør**: Chat-input gør ingenting — tilføj mulighed for at skrive en besked og få et simuleret svar (hardcoded demo-flow). Godkend/Ret-knapperne på BookingCard bør have visuel feedback (f.eks. kort bliver grønt/checkmarked).
+- **Dashboard**: KPI-kort mangler responsivitet — 4 kolonner bryder på smallere skærme. Tilføj `grid-cols-2 md:grid-cols-4`.
+- **Posteringer**: Tilføj periode-filter (dato-range) og bulk-actions (marker flere → godkend/slet) som beskrevet i planen.
 
-### 1. Dashboard (/dashboard)
-- Company header (Bager Consulting, CVR 41679182, Regnskabsår 2025)
-- KPI cards: Omsætning YTD, Resultat YTD, Skyldig moms, Banksaldo
-- Prominent "Indbakke" section with counts (unmatched docs, unmatched transactions, pending AI suggestions) linking to relevant views
-- Recent 5-10 journal entries table with status badges
+### 2. Indbakke-reaktivitet
+Når et AI-forslag godkendes, bør det tilsvarende bilag og den tilsvarende transaktion fjernes fra kolonne 1 og 2. Lige nu er de tre kolonner uafhængige.
 
-### 2. Chat / Bogfør (/bogfoer)
-- 70/30 split: chat bubbles left, context panel right
-- Clean message-app feel — no AI avatars, no typing indicators
-- Demo conversation showing: user describes purchase → system shows structured booking card (amount incl/excl VAT, account, counter-account) with Godkend/Ret buttons → user uploads receipt → system matches it
-- Context panel shows relevant account info based on conversation
+### 3. Moms-side: Breakdown-view
+Planen specificerer at klik på en momsperiode viser breakdown af alle momsposter. Lige nu er det bare et statisk kort. Tilføj expand/collapse med individuelle posteringer.
 
-### 3. Indbakke (/indbakke)
-- Three-column layout:
-  - Col 1: Bilag uden match (8-12 items with thumbnails, vendor, amount, date)
-  - Col 2: Transaktioner uden bilag (10-15 bank transactions)
-  - Col 3: AI-forslag (6-8 auto-matches with confidence scores, Godkend/Afvis buttons)
-- Keyboard navigation: Space=approve, X=reject, arrows=navigate
-- Progress indicator: "12 af 34 forslag behandlet"
-- Drag-and-drop from col 1 to col 2 for manual matching
+### 4. Light theme polish
+Lys-temaet er defineret i CSS-variabler, men siderne er primært designet til mørkt tema. Gennemgå at alle sider ser korrekte ud i light mode — specielt borders, badge-farver og kontrast.
 
-### 4. Bilag (/bilag)
-- **Email forwarding**: Unique address display with copy button, recent 10 received emails log
-- **Gmail/Outlook OAuth**: Connect buttons with transparency about what's accessed
-- **Mobile scanner (/snap)**: Fullscreen camera view, auto-detect receipt, haptic feedback, instant OCR preview, batch mode
-- **Desktop**: Large drag-and-drop zone for images/PDFs, QR code linking to /snap
-- All three methods prominently displayed
+### 5. Responsivitet
+Flere sider (Indbakke 3-kolonne, Bogfør 70/30 split, Dashboard KPI-grid) bryder på tablet/mobil. Tilføj breakpoints så de stacker pænt.
 
-### 5. SKAT / Oplysningsskema (/skat)
-- All relevant SKAT rubrikker with auto-calculated amounts from demo data
-- Per-rubrik: number, field name, calculated amount, expandable explanation
-- Demo data for Bager Consulting (Rubrik 320: 411.397 kr, etc.)
-- "Kopier alle værdier" button + individual copy buttons
-- Status indicator: ready/incomplete with specifics
+### 6. Mobil-scanner (/snap)
+Planen beskriver en dedikeret mobil-first kamera-side med auto-detect, haptic feedback og batch-mode. Denne side er slet ikke bygget endnu. Den kræver MediaDevices API og er et selvstændigt stykke arbejde.
 
-## Placeholder Pages
-- Posteringer, Kontoplan, Moms, Import, Integrationer, Indstillinger — basic layout with "Kommer snart" state, routed but minimal
+### 7. Supabase-integration
+Alle data er hardcoded. Næste store skridt er at forbinde Lovable Cloud med database-tabeller, auth og storage, så data persisterer og flere brugere kan logge ind.
 
-## Demo Data
-- Company: Bager Consulting, CVR 41679182, fiscal year 2025
-- Danish account names, Danish number formatting (1.000,00), 25% VAT
-- Realistic vendors: Elgiganten, DSB, Kontorland, Adobe, etc.
-- All UI text in Danish
+---
 
-## Technical
-- Feature-based folder structure: /features/journal, /features/chat, /features/inbox, /features/documents, /features/tax, etc.
-- TypeScript throughout, shadcn/ui components restyled to match design direction
-- Desktop-first, except /snap which is mobile-first
-- Supabase setup deferred — all demo data hardcoded initially for fast prototyping
+**Anbefalet startpunkt**: Punkt 1 og 2 — de gør den eksisterende prototype markant mere overbevisende som demo uden at tilføje nye sider. Derefter punkt 3-5 for polish, og til sidst punkt 6-7 som større features.
+
+Skal jeg gå i gang med punkt 1 og 2?
 
