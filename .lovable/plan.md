@@ -1,69 +1,66 @@
 
 
-# Supabase, Auth & Inbox-scanning — Plan
+# Gmail Sync — Implementeringsplan
 
-## Nuværende status
-- **Ingen Supabase** er sat op endnu — ingen database, ingen auth, ingen storage
-- Alle data er hardcoded demo-data
-- Ingen connectors linket til projektet
+## Oversigt
 
-## Hvad der skal bygges
+Brugeren har oprettet en Google Cloud app med Gmail API-adgang og har client ID + secret klar. Vi skal nu bygge per-bruger Gmail OAuth-flow og inbox-scanning.
 
-### 1. Aktivér Lovable Cloud (Supabase)
-- Sæt Lovable Cloud op for at få database, auth og storage
-- Opret kernetabeller: `profiles`, `user_roles`, `companies`, `journal_entries`, `documents`, `transactions`, `invoices`, `email_connections`
+## Arkitektur
 
-### 2. Google & Microsoft login (SSO)
-- Aktivér Google og Apple/Microsoft som OAuth-providere i Lovable Cloud auth
-- Byg login-side med "Log ind med Google" og "Log ind med Microsoft" knapper
-- Opret `profiles`-tabel med auto-creation trigger ved signup
-- Tilføj auth-guard på alle routes undtagen login
-
-**Vigtigt om inbox-scanning:** Google og Microsoft SSO giver kun login-adgang. For at scanne brugeres indbakker (Gmail/Outlook) kræves **udvidede OAuth-scopes** (`gmail.readonly` / `Mail.Read`) — dette er per-bruger OAuth, ikke standard SSO.
-
-### 3. Per-bruger inbox-scanning (kræver custom OAuth)
-Lovable's connectors giver kun adgang til *din egen* konto. For at scanne *hver brugers* indbakke skal vi:
-
-- **Google**: Registrere en app i Google Cloud Console med `gmail.readonly` scope, implementere OAuth-flow hvor brugeren giver adgang, gemme refresh-tokens per bruger
-- **Microsoft**: Registrere en app i Microsoft Entra med `Mail.Read` scope, samme flow
-
-Dette kræver:
-- En `email_connections`-tabel (user_id, provider, access_token, refresh_token, scopes, connected_at)
-- Edge functions til: OAuth callback, token refresh, inbox polling
-- En edge function der scanner indbakker for kvitteringer og opretter `documents` automatisk
-
-### Spørgsmål før implementering
-
-Inbox-scanning med per-bruger OAuth kræver at du registrerer apps hos Google og Microsoft. Det er et større setup.
-
-**Anbefalet tilgang i to trin:**
-1. **Først**: Sæt Lovable Cloud op + Google/Microsoft login + database-tabeller + auth-guard
-2. **Derefter**: Implementér inbox-scanning som separat feature (kræver Google Cloud Console + Microsoft Entra opsætning fra din side)
-
-Skal jeg starte med trin 1 (auth + database), og så tager vi inbox-scanning bagefter?
-
-## Tekniske detaljer
-
-### Database-tabeller (trin 1)
 ```text
-profiles (id, user_id FK auth.users, full_name, avatar_url, created_at)
-user_roles (id, user_id FK auth.users, role enum(admin/user))
-companies (id, owner_id FK auth.users, name, cvr, fiscal_year_start)
-documents (id, company_id, vendor, amount, date, file_url, status, source)
-journal_entries (id, company_id, date, description, amount, account, status)
-transactions (id, company_id, date, description, amount, source, matched_document_id)
-invoices (id, company_id, customer, number, date, due_date, total, status)
+Bruger klikker "Forbind Gmail"
+  → Edge function (gmail-auth) genererer Google OAuth URL med gmail.readonly scope
+  → Bruger autoriserer i Google
+  → Callback til edge function (gmail-callback) → gemmer tokens i email_connections
+  → Edge function (scan-inbox) poller Gmail for kvitteringer → opretter documents
 ```
 
-### Auth flow
-- Login-side på `/login` med Google + Microsoft knapper
-- `AuthProvider` context wrapping hele appen
-- Protected routes via `useAuth()` hook
-- Auto-redirect til `/login` hvis ikke logget ind
+## Trin
 
-### Inbox-scanning (trin 2, separat)
-- Edge function `scan-inbox` kaldt via cron eller manuelt
-- Søger efter emails med vedhæftede filer (PDF, billeder)
-- Opretter `documents` med `source: 'gmail'` eller `source: 'outlook'`
-- Bruger gemte refresh-tokens til at hente emails
+### 1. Gem Google OAuth credentials som secrets
+- Brug `add_secret` til at bede brugeren indtaste `GOOGLE_GMAIL_CLIENT_ID` og `GOOGLE_GMAIL_CLIENT_SECRET`
+
+### 2. Opret 3 edge functions
+
+**`gmail-auth`** — Genererer Google OAuth consent URL
+- Bygger authorize-URL med scopes: `gmail.readonly`
+- Redirect URI: `https://oxxioffwasbwbsinbowi.supabase.co/functions/v1/gmail-callback`
+- Returnerer URL til frontend
+
+**`gmail-callback`** — OAuth callback handler
+- Modtager authorization code fra Google
+- Udveksler til access_token + refresh_token
+- Gemmer krypteret i `email_connections` tabellen
+- Redirecter bruger tilbage til `/integrationer` med success-besked
+
+**`scan-inbox`** — Scanner Gmail for kvitteringer
+- Henter emails med vedhæftede filer (PDF, billeder) fra de seneste 7 dage
+- Bruger refresh_token til at forny access_token
+- Opretter `documents` med `source: 'gmail'`
+- Kan kaldes manuelt eller via cron
+
+### 3. Opdater frontend
+
+**`Integrationer.tsx`** — "Forbind Gmail" knap kalder `gmail-auth` og åbner OAuth-vindue. Viser "Forbundet" status når `email_connections` har en Gmail-række.
+
+**`Bilag.tsx`** — "Forbind Gmail" knap bruger samme flow. Viser synkroniserede emails fra `documents` tabellen.
+
+### 4. Tilføj `deno.json` import map
+- Opsæt import map for edge functions med nødvendige dependencies
+
+## Filer der oprettes/ændres
+
+| Fil | Handling |
+|-----|---------|
+| `supabase/functions/gmail-auth/index.ts` | Ny |
+| `supabase/functions/gmail-callback/index.ts` | Ny |
+| `supabase/functions/scan-inbox/index.ts` | Ny |
+| `src/pages/Integrationer.tsx` | Opdater — forbind-knap + status |
+| `src/pages/Bilag.tsx` | Opdater — forbind Gmail-knap |
+
+## Sikkerhed
+- Tokens gemmes krypteret i `email_connections` (tabellen har RLS: kun egen bruger)
+- Edge functions validerer JWT fra Supabase session
+- Refresh tokens bruges server-side, aldrig eksponeret til frontend
 
