@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useCompany } from "@/hooks/useCompany";
 import { Layout } from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import Bogfoer from "@/pages/Bogfoer";
@@ -19,6 +20,7 @@ import Indstillinger from "@/pages/Indstillinger";
 import Faktura from "@/pages/Faktura";
 import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
+import Onboarding from "@/pages/Onboarding";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,32 +43,60 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RequireCompany({ children }: { children: React.ReactNode }) {
+  const { company, loading } = useCompany();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+      </div>
+    );
+  }
+
+  if (!company) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/reset-password" element={<ResetPassword />} />
     <Route
+      path="/onboarding"
+      element={
+        <ProtectedRoute>
+          <Onboarding />
+        </ProtectedRoute>
+      }
+    />
+    <Route
       path="/*"
       element={
         <ProtectedRoute>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/bogfoer" element={<Bogfoer />} />
-              <Route path="/indbakke" element={<Indbakke />} />
-              <Route path="/faktura" element={<Faktura />} />
-              <Route path="/bilag" element={<Bilag />} />
-              <Route path="/skat" element={<Skat />} />
-              <Route path="/posteringer" element={<Posteringer />} />
-              <Route path="/kontoplan" element={<Kontoplan />} />
-              <Route path="/moms" element={<Moms />} />
-              <Route path="/import" element={<Import />} />
-              <Route path="/integrationer" element={<Integrationer />} />
-              <Route path="/indstillinger" element={<Indstillinger />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Layout>
+          <RequireCompany>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/bogfoer" element={<Bogfoer />} />
+                <Route path="/indbakke" element={<Indbakke />} />
+                <Route path="/faktura" element={<Faktura />} />
+                <Route path="/bilag" element={<Bilag />} />
+                <Route path="/skat" element={<Skat />} />
+                <Route path="/posteringer" element={<Posteringer />} />
+                <Route path="/kontoplan" element={<Kontoplan />} />
+                <Route path="/moms" element={<Moms />} />
+                <Route path="/import" element={<Import />} />
+                <Route path="/integrationer" element={<Integrationer />} />
+                <Route path="/indstillinger" element={<Indstillinger />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Layout>
+          </RequireCompany>
         </ProtectedRoute>
       }
     />
