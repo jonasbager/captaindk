@@ -26,12 +26,12 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { company, inboxCounts } from "@/lib/demo-data";
+import { useCompany } from "@/hooks/useCompany";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutGrid },
   { title: "Bogfør", url: "/bogfoer", icon: MessageSquare },
-  { title: "Indbakke", url: "/indbakke", icon: Inbox, badge: inboxCounts.pendingSuggestions },
+  { title: "Indbakke", url: "/indbakke", icon: Inbox },
   { title: "Faktura", url: "/faktura", icon: FileText },
   { title: "Bilag", url: "/bilag", icon: Receipt },
   { title: "Posteringer", url: "/posteringer", icon: List },
@@ -47,6 +47,11 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { company } = useCompany();
+
+  const initials = company?.name
+    ? company.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+    : "??";
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -75,14 +80,6 @@ export function AppSidebar() {
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="ml-2">{item.title}</span>}
-                      {item.badge && !collapsed && (
-                        <span className="ml-auto text-[10px] font-mono bg-primary/20 text-primary px-1.5 py-0.5 rounded">
-                          {item.badge}
-                        </span>
-                      )}
-                      {item.badge && collapsed && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary" />
-                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -95,16 +92,16 @@ export function AppSidebar() {
         {!collapsed ? (
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded bg-primary/20 text-primary flex items-center justify-center text-xs font-mono font-semibold">
-              JB
+              {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate">{company.name}</p>
-              <p className="text-[10px] text-muted-foreground font-mono">CVR {company.cvr}</p>
+              <p className="text-xs font-medium truncate">{company?.name || "—"}</p>
+              {company?.cvr && <p className="text-[10px] text-muted-foreground font-mono">CVR {company.cvr}</p>}
             </div>
           </div>
         ) : (
           <div className="w-7 h-7 rounded bg-primary/20 text-primary flex items-center justify-center text-xs font-mono font-semibold mx-auto">
-            JB
+            {initials}
           </div>
         )}
       </SidebarFooter>
