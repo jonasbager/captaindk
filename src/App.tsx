@@ -9,7 +9,12 @@ import Bogfoer from "@/pages/Bogfoer";
 import Indbakke from "@/pages/Indbakke";
 import Bilag from "@/pages/Bilag";
 import Skat from "@/pages/Skat";
-import Placeholder from "@/pages/Placeholder";
+import Posteringer from "@/pages/Posteringer";
+import Kontoplan from "@/pages/Kontoplan";
+import Moms from "@/pages/Moms";
+import Import from "@/pages/Import";
+import Integrationer from "@/pages/Integrationer";
+import Indstillinger from "@/pages/Indstillinger";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,12 +33,12 @@ const App = () => (
             <Route path="/indbakke" element={<Indbakke />} />
             <Route path="/bilag" element={<Bilag />} />
             <Route path="/skat" element={<Skat />} />
-            <Route path="/posteringer" element={<Placeholder title="Posteringer" />} />
-            <Route path="/kontoplan" element={<Placeholder title="Kontoplan" />} />
-            <Route path="/moms" element={<Placeholder title="Moms" />} />
-            <Route path="/import" element={<Placeholder title="CSV Import" />} />
-            <Route path="/integrationer" element={<Placeholder title="Integrationer" />} />
-            <Route path="/indstillinger" element={<Placeholder title="Indstillinger" />} />
+            <Route path="/posteringer" element={<Posteringer />} />
+            <Route path="/kontoplan" element={<Kontoplan />} />
+            <Route path="/moms" element={<Moms />} />
+            <Route path="/import" element={<Import />} />
+            <Route path="/integrationer" element={<Integrationer />} />
+            <Route path="/indstillinger" element={<Indstillinger />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
