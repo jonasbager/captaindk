@@ -224,7 +224,7 @@ export default function Onboarding() {
         options: [{ label: "Spring CVR over", value: "skip_cvr" }],
       });
       setStep("manual_cvr_optional");
-    } else if ((step as string) === "manual_cvr_optional") {
+    } else if (step === "manual_cvr_optional") {
       const cleaned = text.replace(/\s|-/g, "");
       if (/^\d{8}$/.test(cleaned)) {
         setCompanyCvr(cleaned);
@@ -421,7 +421,7 @@ export default function Onboarding() {
                   ? "Indtast virksomhedsnavn..."
                   : step === "fiscal_year"
                   ? "ÅÅÅÅ-MM-DD..."
-                  : (step as string) === "manual_cvr_optional"
+                  : step === "manual_cvr_optional"
                   ? "CVR-nummer (valgfrit)..."
                   : "Skriv her..."
               }
