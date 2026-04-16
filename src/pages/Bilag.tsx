@@ -4,11 +4,11 @@ import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, S
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-const emailAddress = "jonas.bager@bilag.bogforing.dk";
+const emailAddress = "jonas.bager@bilag.captain.dk";
 
 const recentEmails = [
   { id: 1, from: "noreply@elgiganten.dk", subject: "Din kvittering fra Elgiganten", status: "behandlet" as const },
-  { id: 2, from: "invoice@adobe.com", subject: "Invoice #INV-2025-8841", status: "behandlet" as const },
+  { id: 2, from: "invoice@adobe.com", subject: "Invoice #2026-8841", status: "behandlet" as const },
   { id: 3, from: "kvittering@dsb.dk", subject: "Rejsekvittering", status: "behandlet" as const },
   { id: 4, from: "receipt@wolt.com", subject: "Your Wolt receipt", status: "venter" as const },
   { id: 5, from: "order@amazon.de", subject: "Ihre Rechnung", status: "fejlet" as const },
@@ -36,7 +36,6 @@ export default function Bilag() {
       </motion.h1>
 
       <div className="grid grid-cols-3 gap-4">
-        {/* Email forwarding */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="border border-border/50 rounded p-4 space-y-4 col-span-2"
         >
@@ -54,7 +53,6 @@ export default function Bilag() {
             </Button>
           </div>
 
-          {/* Recent emails */}
           <div>
             <p className="text-xs text-muted-foreground mb-2">Seneste modtagne emails</p>
             <div className="space-y-1.5">
@@ -69,7 +67,6 @@ export default function Bilag() {
           </div>
         </motion.div>
 
-        {/* Mobile scanner QR */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="border border-border/50 rounded p-4 space-y-4 flex flex-col items-center justify-center text-center"
         >
@@ -87,13 +84,12 @@ export default function Bilag() {
         </motion.div>
       </div>
 
-      {/* Gmail/Outlook */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="border border-border/50 rounded p-4 space-y-3"
       >
         <h2 className="text-sm font-semibold">Email-integration</h2>
         <p className="text-xs text-muted-foreground">
-          Forbind din email-konto så systemet automatisk finder kvitteringer. Vi søger kun efter emails med "kvittering", "receipt", "faktura" eller "invoice" i emnet.
+          Forbind din email-konto så systemet automatisk finder kvitteringer.
         </p>
         <div className="flex gap-3">
           <Button variant="outline" size="sm" className="text-xs">Forbind Gmail</Button>
@@ -101,7 +97,6 @@ export default function Bilag() {
         </div>
       </motion.div>
 
-      {/* Drag and drop */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         className={`border-2 border-dashed rounded p-12 text-center transition-colors ${
           dragOver ? "border-primary bg-primary/5" : "border-border/40"

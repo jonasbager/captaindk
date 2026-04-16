@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 export default function Skat() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState<number | null>(null);
-  const allComplete = true;
 
   const copyAll = () => {
     const text = taxRubrikker.map((r) => `Rubrik ${r.number}: ${formatAmountShort(r.amount)}`).join("\n");
@@ -29,7 +28,7 @@ export default function Skat() {
             <Building2 className="h-5 w-5" /> Oplysningsskema
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            {company.name} · CVR {company.cvr} · Regnskabsår {company.fiscalYear}
+            {company.name} · CVR {company.cvr} · Regnskabsår 2025
           </p>
         </div>
         <div className="flex items-center gap-3">

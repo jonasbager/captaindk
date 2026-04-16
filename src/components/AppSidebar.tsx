@@ -10,6 +10,8 @@ import {
   Upload,
   Plug,
   Settings,
+  Compass,
+  FileText,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -30,6 +32,7 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutGrid },
   { title: "Bogfør", url: "/bogfoer", icon: MessageSquare },
   { title: "Indbakke", url: "/indbakke", icon: Inbox, badge: inboxCounts.pendingSuggestions },
+  { title: "Faktura", url: "/faktura", icon: FileText },
   { title: "Bilag", url: "/bilag", icon: Receipt },
   { title: "Posteringer", url: "/posteringer", icon: List },
   { title: "Kontoplan", url: "/kontoplan", icon: BookOpen },
@@ -48,9 +51,14 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarContent className="pt-4">
-        {!collapsed && (
-          <div className="px-4 pb-4 mb-2 border-b border-border/30">
-            <span className="text-xs font-mono tracking-widest uppercase text-muted-foreground">Bogføring</span>
+        {!collapsed ? (
+          <div className="px-4 pb-4 mb-2 border-b border-border/30 flex items-center gap-2">
+            <Compass className="h-5 w-5 text-primary" />
+            <span className="text-xs font-mono tracking-widest uppercase text-muted-foreground">Captain</span>
+          </div>
+        ) : (
+          <div className="flex justify-center pb-4 mb-2 border-b border-border/30">
+            <Compass className="h-5 w-5 text-primary" />
           </div>
         )}
         <SidebarGroup>

@@ -26,31 +26,8 @@ interface VatPeriod {
 
 const vatPeriods: VatPeriod[] = [
   {
-    id: "h1-2024", label: "H1 2024", start: "2024-01-01", end: "2024-06-30",
-    salesVat: 48200, purchaseVat: 18340, netVat: 29860, status: "betalt",
-    lines: [
-      { date: "2024-01-15", description: "Faktura #2024-001 — Konsulenthonorar", amount: 12500, type: "salg" },
-      { date: "2024-02-10", description: "Faktura #2024-005 — Webdesign", amount: 8750, type: "salg" },
-      { date: "2024-03-20", description: "Adobe Creative Cloud", amount: -1123, type: "køb" },
-      { date: "2024-04-05", description: "Faktura #2024-012 — Rådgivning", amount: 15200, type: "salg" },
-      { date: "2024-05-18", description: "Kontorartikler", amount: -3450, type: "køb" },
-      { date: "2024-06-30", description: "Faktura #2024-018 — Udvikling", amount: 11750, type: "salg" },
-    ],
-  },
-  {
-    id: "h2-2024", label: "H2 2024", start: "2024-07-01", end: "2024-12-31",
-    salesVat: 54700, purchaseVat: 21120, netVat: 33580, status: "betalt",
-    lines: [
-      { date: "2024-07-10", description: "Faktura #2024-022 — Projektledelse", amount: 18500, type: "salg" },
-      { date: "2024-08-22", description: "Software licenser", amount: -4200, type: "køb" },
-      { date: "2024-09-15", description: "Faktura #2024-028 — Design", amount: 14300, type: "salg" },
-      { date: "2024-10-05", description: "Kontorindretning", amount: -8750, type: "køb" },
-      { date: "2024-11-20", description: "Faktura #2024-035 — Konsulenthonorar", amount: 21900, type: "salg" },
-    ],
-  },
-  {
     id: "h1-2025", label: "H1 2025", start: "2025-01-01", end: "2025-06-30",
-    salesVat: 62400, purchaseVat: 24850, netVat: 37550, status: "indberettet", deadline: "2025-09-01",
+    salesVat: 62400, purchaseVat: 24850, netVat: 37550, status: "betalt",
     lines: [
       { date: "2025-01-12", description: "Faktura #2025-001 — Webdesign", amount: 22000, type: "salg" },
       { date: "2025-02-03", description: "GitHub Pro plan", amount: -183, type: "køb" },
@@ -62,13 +39,25 @@ const vatPeriods: VatPeriod[] = [
   },
   {
     id: "h2-2025", label: "H2 2025", start: "2025-07-01", end: "2025-12-31",
-    salesVat: 18250, purchaseVat: 19507, netVat: -1257, status: "åben", deadline: "2026-03-01",
+    salesVat: 18250, purchaseVat: 19507, netVat: -1257, status: "betalt",
     lines: [
       { date: "2025-07-15", description: "Faktura #2025-048 — Rådgivning", amount: 12500, type: "salg" },
       { date: "2025-08-20", description: "Adobe Creative Cloud", amount: -449, type: "køb" },
       { date: "2025-09-10", description: "DSB — Transport", amount: -342, type: "køb" },
       { date: "2025-10-01", description: "Proshop — USB-hub", amount: -2199, type: "køb" },
       { date: "2025-10-22", description: "Faktura #2025-052 — Design", amount: 5750, type: "salg" },
+    ],
+  },
+  {
+    id: "h1-2026", label: "H1 2026", start: "2026-01-01", end: "2026-06-30",
+    salesVat: 48200, purchaseVat: 18340, netVat: 29860, status: "åben", deadline: "2026-09-01",
+    lines: [
+      { date: "2026-01-15", description: "Faktura #2026-001 — Konsulenthonorar", amount: 35000, type: "salg" },
+      { date: "2026-02-10", description: "Faktura #2026-005 — Webdesign", amount: 28500, type: "salg" },
+      { date: "2026-03-20", description: "Adobe Creative Cloud", amount: -449, type: "køb" },
+      { date: "2026-04-07", description: "Faktura #2026-046 — Konsulenthonorar", amount: 45000, type: "salg" },
+      { date: "2026-04-15", description: "Elgiganten — Skærm", amount: -3499, type: "køb" },
+      { date: "2026-04-09", description: "Kontorland — Kontorartikler", amount: -1287, type: "køb" },
     ],
   },
 ];

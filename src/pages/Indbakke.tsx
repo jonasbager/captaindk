@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, FileText, CreditCard, Sparkles, GripVertical } from "lucide-react";
+import { Check, X, FileText, CreditCard, Sparkles, GripVertical, Anchor } from "lucide-react";
 import { unmatchedDocuments as initialDocs, unmatchedTransactions as initialTxs, matchSuggestions as initialSuggestions, formatAmount } from "@/lib/demo-data";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,11 +12,13 @@ export default function Indbakke() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [processed, setProcessed] = useState(0);
   const total = initialSuggestions.length;
+  const [hoveredSuggestion, setHoveredSuggestion] = useState<string | null>(null);
 
-  // Drag state
   const [draggedDocId, setDraggedDocId] = useState<string | null>(null);
   const [dragOverTxId, setDragOverTxId] = useState<string | null>(null);
   const [manualMatches, setManualMatches] = useState<{ docId: string; txId: string; vendor: string; amount: number }[]>([]);
+
+  const hoveredMatch = hoveredSuggestion ? suggestions.find(s => s.id === hoveredSuggestion) : null;
 
   const handleApprove = useCallback(() => {
     if (suggestions.length === 0) return;
@@ -36,7 +38,6 @@ export default function Indbakke() {
     setSelectedIndex((i) => Math.min(i, suggestions.length - 2));
   }, [selectedIndex, suggestions]);
 
-  // Manual drag-and-drop matching
   const handleDrop = useCallback((txId: string) => {
     if (!draggedDocId) return;
     const doc = documents.find((d) => d.id === draggedDocId);
@@ -61,7 +62,6 @@ export default function Indbakke() {
 
   return (
     <div className="h-[calc(100vh-2.75rem)] flex flex-col">
-      {/* Progress bar */}
       <div className="px-6 pt-4 pb-2 border-b border-border/30">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-sm font-semibold">Indbakke</h1>
@@ -92,8 +92,10 @@ export default function Indbakke() {
                   draggable
                   onDragStart={() => setDraggedDocId(doc.id)}
                   onDragEnd={() => { setDraggedDocId(null); setDragOverTxId(null); }}
-                  className={`border border-border/40 rounded p-3 hover:border-border/70 transition-colors cursor-grab active:cursor-grabbing ${
-                    draggedDocId === doc.id ? "opacity-50" : ""
+                  className={`border rounded p-3 transition-colors cursor-grab active:cursor-grabbing ${
+                    draggedDocId === doc.id ? "opacity-50" :
+                    hoveredMatch?.documentId === doc.id ? "border-primary/60 bg-primary/5" :
+                    "border-border/40 hover:border-border/70"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -135,9 +137,9 @@ export default function Indbakke() {
                   onDragLeave={() => setDragOverTxId(null)}
                   onDrop={(e) => { e.preventDefault(); handleDrop(tx.id); }}
                   className={`border rounded p-3 transition-colors ${
-                    dragOverTxId === tx.id
-                      ? "border-primary/60 bg-primary/5"
-                      : "border-border/40 hover:border-border/70"
+                    dragOverTxId === tx.id ? "border-primary/60 bg-primary/5" :
+                    hoveredMatch?.transactionId === tx.id ? "border-primary/60 bg-primary/5" :
+                    "border-border/40 hover:border-border/70"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -151,7 +153,6 @@ export default function Indbakke() {
               ))}
             </AnimatePresence>
           </div>
-          {/* Manual matches */}
           {manualMatches.length > 0 && (
             <div className="mt-4 pt-3 border-t border-border/30">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Manuelt matchet</p>
@@ -173,9 +174,11 @@ export default function Indbakke() {
               AI-forslag <span className="text-foreground">({suggestions.length})</span>
             </h2>
           </div>
-          <p className="text-[10px] text-muted-foreground mb-3 font-mono">
-            Mellemrum = godkend · X = afvis · ↑↓ = navigér
-          </p>
+          <div className="border border-border/40 rounded px-3 py-2 mb-3 bg-card">
+            <p className="text-[11px] text-muted-foreground font-mono">
+              <span className="text-foreground font-semibold">Mellemrum</span> = godkend · <span className="text-foreground font-semibold">X</span> = afvis · <span className="text-foreground font-semibold">↑↓</span> = navigér
+            </p>
+          </div>
           <div className="space-y-2">
             <AnimatePresence>
               {suggestions.map((match, i) => (
@@ -186,6 +189,8 @@ export default function Indbakke() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0, padding: 0 }}
                   transition={{ duration: 0.2 }}
+                  onMouseEnter={() => setHoveredSuggestion(match.id)}
+                  onMouseLeave={() => setHoveredSuggestion(null)}
                   className={`border rounded p-3 transition-colors ${
                     i === selectedIndex ? "border-primary/60 bg-primary/5" : "border-border/40"
                   }`}
@@ -213,8 +218,10 @@ export default function Indbakke() {
               ))}
             </AnimatePresence>
             {suggestions.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Alle forslag er behandlet ✓
+              <div className="text-center py-12 text-muted-foreground">
+                <Anchor className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Alle forslag behandlet.</p>
+                <p className="text-xs mt-1">Kom tilbage senere ⚓</p>
               </div>
             )}
           </div>
