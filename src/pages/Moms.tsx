@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import { formatAmountShort, formatAmount } from "@/lib/demo-data";
+import { formatAmountShort, formatAmount } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 
 interface VatLine {

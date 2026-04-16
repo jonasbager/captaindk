@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Paperclip, Check, Pencil, CheckCircle } from "lucide-react";
-import { chatMessages as initialMessages, formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 

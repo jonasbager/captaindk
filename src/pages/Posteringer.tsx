@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Filter, FileText, Check, Trash2 } from "lucide-react";
-import { recentEntries, formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

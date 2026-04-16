@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Copy, Check, ChevronDown, ChevronUp, Building2 } from "lucide-react";
-import { taxRubrikker, formatAmountShort, company } from "@/lib/demo-data";
+import { formatAmountShort } from "@/lib/format";
+import { useCompany } from "@/hooks/useCompany";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 

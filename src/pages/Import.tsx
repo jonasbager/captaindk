@@ -4,7 +4,7 @@ import { Upload, FileSpreadsheet, Check, AlertCircle, ChevronRight, Pencil } fro
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 
 const previewRows = [
   { col1: "2026-04-01", col2: "IKEA AARHUS", col3: "-3450.00", col4: "DKK", col5: "123456" },

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, X, FileText, CreditCard, Sparkles, GripVertical, Anchor } from "lucide-react";
-import { unmatchedDocuments as initialDocs, unmatchedTransactions as initialTxs, matchSuggestions as initialSuggestions, formatAmount } from "@/lib/demo-data";
+import { formatAmount } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
