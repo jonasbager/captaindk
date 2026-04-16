@@ -14,16 +14,327 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      companies: {
+        Row: {
+          created_at: string
+          cvr: string | null
+          fiscal_year_start: string
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cvr?: string | null
+          fiscal_year_start?: string
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cvr?: string | null
+          fiscal_year_start?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          amount: number | null
+          company_id: string
+          created_at: string
+          date: string | null
+          file_url: string | null
+          id: string
+          source: string
+          status: string
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          amount?: number | null
+          company_id: string
+          created_at?: string
+          date?: string | null
+          file_url?: string | null
+          id?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number | null
+          company_id?: string
+          created_at?: string
+          date?: string | null
+          file_url?: string | null
+          id?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_connections: {
+        Row: {
+          connected_at: string
+          encrypted_access_token: string | null
+          encrypted_refresh_token: string | null
+          id: string
+          provider: string
+          scopes: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          encrypted_access_token?: string | null
+          encrypted_refresh_token?: string | null
+          id?: string
+          provider: string
+          scopes?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          encrypted_access_token?: string | null
+          encrypted_refresh_token?: string | null
+          id?: string
+          provider?: string
+          scopes?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer: string
+          date: string
+          due_date: string
+          id: string
+          lines: Json
+          number: number
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer: string
+          date: string
+          due_date: string
+          id?: string
+          lines?: Json
+          number: number
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer?: string
+          date?: string
+          due_date?: string
+          id?: string
+          lines?: Json
+          number?: number
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entries: {
+        Row: {
+          account: string
+          account_number: number | null
+          amount: number
+          company_id: string
+          created_at: string
+          date: string
+          description: string
+          has_document: boolean
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account: string
+          account_number?: number | null
+          amount: number
+          company_id: string
+          created_at?: string
+          date: string
+          description: string
+          has_document?: boolean
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account?: string
+          account_number?: number | null
+          amount?: number
+          company_id?: string
+          created_at?: string
+          date?: string
+          description?: string
+          has_document?: boolean
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          date: string
+          description: string
+          id: string
+          matched_document_id: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          date: string
+          description: string
+          id?: string
+          matched_document_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+          matched_document_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_matched_document_id_fkey"
+            columns: ["matched_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +461,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
