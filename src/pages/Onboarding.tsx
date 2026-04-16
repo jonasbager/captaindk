@@ -28,7 +28,7 @@ interface CvrCompany {
   startdate: string;
 }
 
-type Step = "welcome" | "cvr_input" | "cvr_confirm" | "manual_name" | "fiscal_year" | "creating" | "done";
+type Step = "welcome" | "cvr_input" | "cvr_confirm" | "manual_name" | "manual_cvr_optional" | "fiscal_year" | "creating" | "done";
 
 export default function Onboarding() {
   const { user } = useAuth();
