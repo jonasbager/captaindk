@@ -18,6 +18,7 @@ import Integrationer from "@/pages/Integrationer";
 import Indstillinger from "@/pages/Indstillinger";
 import Faktura from "@/pages/Faktura";
 import Login from "@/pages/Login";
+import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
