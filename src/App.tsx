@@ -15,6 +15,7 @@ import Moms from "@/pages/Moms";
 import Import from "@/pages/Import";
 import Integrationer from "@/pages/Integrationer";
 import Indstillinger from "@/pages/Indstillinger";
+import Faktura from "@/pages/Faktura";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bogfoer" element={<Bogfoer />} />
             <Route path="/indbakke" element={<Indbakke />} />
+            <Route path="/faktura" element={<Faktura />} />
             <Route path="/bilag" element={<Bilag />} />
             <Route path="/skat" element={<Skat />} />
             <Route path="/posteringer" element={<Posteringer />} />

@@ -23,7 +23,6 @@ interface ChatMessage {
   approved?: boolean;
 }
 
-// Demo responses for simulated chat
 const demoResponses: { trigger: RegExp; response: ChatMessage }[] = [
   {
     trigger: /faktura|invoice/i,
@@ -113,7 +112,6 @@ export default function Bogfoer() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
 
-    // Simulate AI response after short delay
     setTimeout(() => {
       const matched = demoResponses.find((r) => r.trigger.test(text));
       const response: ChatMessage = matched
@@ -125,7 +123,6 @@ export default function Bogfoer() {
 
   const handleApprove = (msgId: string) => {
     setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, approved: true } : m));
-    // Add confirmation message
     setTimeout(() => {
       setMessages((prev) => [...prev, {
         id: `s-${Date.now()}`,
@@ -137,7 +134,6 @@ export default function Bogfoer() {
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-2.75rem)]">
-      {/* Chat area */}
       <div className="flex-[7] flex flex-col border-r border-border/30">
         <div ref={scrollRef} className="flex-1 overflow-auto p-6 space-y-4">
           <AnimatePresence initial={false}>
@@ -149,27 +145,32 @@ export default function Bogfoer() {
                 transition={{ duration: 0.25 }}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div
-                  className={`max-w-[75%] rounded px-4 py-3 text-sm ${
-                    msg.role === "user"
-                      ? "bg-accent text-foreground"
-                      : "bg-card border border-border/40"
-                  }`}
-                >
-                  {msg.content && <p>{msg.content}</p>}
-                  {msg.booking && (
-                    <BookingCard
-                      booking={msg.booking}
-                      approved={msg.approved}
-                      onApprove={() => handleApprove(msg.id)}
-                    />
+                <div className="max-w-[75%]">
+                  {msg.role === "system" && (
+                    <p className="text-[10px] text-muted-foreground mb-1 font-medium">Nav</p>
                   )}
-                  {msg.hasAttachment && (
-                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <Paperclip className="h-3 w-3" />
-                      <span>kvittering_elgiganten.pdf</span>
-                    </div>
-                  )}
+                  <div
+                    className={`rounded px-4 py-3 text-sm ${
+                      msg.role === "user"
+                        ? "bg-accent text-foreground"
+                        : "bg-card border border-border/40"
+                    }`}
+                  >
+                    {msg.content && <p>{msg.content}</p>}
+                    {msg.booking && (
+                      <BookingCard
+                        booking={msg.booking}
+                        approved={msg.approved}
+                        onApprove={() => handleApprove(msg.id)}
+                      />
+                    )}
+                    {msg.hasAttachment && (
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                        <Paperclip className="h-3 w-3" />
+                        <span>kvittering_elgiganten.pdf</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -193,7 +194,6 @@ export default function Bogfoer() {
         </div>
       </div>
 
-      {/* Context panel */}
       <div className="flex-[3] p-4 overflow-auto hidden md:block">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Kontekst</h3>
         <div className="space-y-4">
@@ -216,14 +216,14 @@ export default function Bogfoer() {
           </div>
           <div className="border border-border/40 rounded p-3 space-y-2">
             <p className="text-xs text-muted-foreground">Momsperiode</p>
-            <p className="text-sm">H1 2025 — <span className="text-primary text-xs">Indberettet</span></p>
-            <p className="text-sm">H2 2025 — <span className="text-warning text-xs">Åben</span></p>
+            <p className="text-sm">H2 2025 — <span className="text-primary text-xs">Betalt</span></p>
+            <p className="text-sm">H1 2026 — <span className="text-warning text-xs">Åben</span></p>
           </div>
           <div className="border border-border/40 rounded p-3 space-y-2">
             <p className="text-xs text-muted-foreground">Seneste posteringer — Småanskaffelser</p>
             <div className="text-xs space-y-1 text-muted-foreground">
-              <p>2025-03-22 · Logitech mus · <span className="font-mono">-499,00 kr</span></p>
-              <p>2025-02-10 · Skærmstativ · <span className="font-mono">-1.299,00 kr</span></p>
+              <p>2026-03-22 · Logitech mus · <span className="font-mono">-499,00 kr</span></p>
+              <p>2026-02-10 · Skærmstativ · <span className="font-mono">-1.299,00 kr</span></p>
             </div>
           </div>
         </div>
