@@ -1,18 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, Smartphone } from "lucide-react";
+import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, Smartphone, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const emailAddress = "jonas.bager@bilag.captain.dk";
-
-const recentEmails = [
-  { id: 1, from: "noreply@elgiganten.dk", subject: "Din kvittering fra Elgiganten", status: "behandlet" as const },
-  { id: 2, from: "invoice@adobe.com", subject: "Invoice #2026-8841", status: "behandlet" as const },
-  { id: 3, from: "kvittering@dsb.dk", subject: "Rejsekvittering", status: "behandlet" as const },
-  { id: 4, from: "receipt@wolt.com", subject: "Your Wolt receipt", status: "venter" as const },
-  { id: 5, from: "order@amazon.de", subject: "Ihre Rechnung", status: "fejlet" as const },
-];
 
 const statusIcon = {
   behandlet: <CheckCircle2 className="h-3.5 w-3.5 text-primary" />,
@@ -22,11 +16,53 @@ const statusIcon = {
 
 export default function Bilag() {
   const { toast } = useToast();
+  const { session } = useAuth();
   const [dragOver, setDragOver] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [recentDocs, setRecentDocs] = useState<Array<{ id: string; vendor: string; date: string | null; status: string; source: string }>>([]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    // Check Gmail connection
+    supabase
+      .from("email_connections")
+      .select("id")
+      .eq("user_id", session.user.id)
+      .eq("provider", "gmail")
+      .single()
+      .then(({ data }) => setGmailConnected(!!data));
+
+    // Load recent gmail documents
+    supabase
+      .from("documents")
+      .select("id, vendor, date, status, source")
+      .eq("source", "gmail")
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data) setRecentDocs(data);
+      });
+  }, [session]);
 
   const copyEmail = () => {
     navigator.clipboard.writeText(emailAddress);
     toast({ title: "Kopieret", description: "Email-adresse kopieret til udklipsholder" });
+  };
+
+  const connectGmail = async () => {
+    setConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gmail-auth");
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      toast({ title: "Fejl", description: err.message || "Kunne ikke starte Gmail-forbindelse", variant: "destructive" });
+      setConnecting(false);
+    }
   };
 
   return (
@@ -53,18 +89,20 @@ export default function Bilag() {
             </Button>
           </div>
 
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Seneste modtagne emails</p>
-            <div className="space-y-1.5">
-              {recentEmails.map((email) => (
-                <div key={email.id} className="flex items-center gap-3 text-xs p-2 rounded hover:bg-accent/30 transition-colors">
-                  {statusIcon[email.status]}
-                  <span className="text-muted-foreground font-mono w-40 truncate">{email.from}</span>
-                  <span className="flex-1 truncate">{email.subject}</span>
-                </div>
-              ))}
+          {recentDocs.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Seneste Gmail-bilag</p>
+              <div className="space-y-1.5">
+                {recentDocs.map((doc) => (
+                  <div key={doc.id} className="flex items-center gap-3 text-xs p-2 rounded hover:bg-accent/30 transition-colors">
+                    {statusIcon[doc.status as keyof typeof statusIcon] || statusIcon.venter}
+                    <span className="text-muted-foreground truncate flex-1">{doc.vendor || "Ukendt"}</span>
+                    <span className="text-muted-foreground">{doc.date || "—"}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
@@ -92,8 +130,17 @@ export default function Bilag() {
           Forbind din email-konto så systemet automatisk finder kvitteringer.
         </p>
         <div className="flex gap-3">
-          <Button variant="outline" size="sm" className="text-xs">Forbind Gmail</Button>
-          <Button variant="outline" size="sm" className="text-xs">Forbind Outlook</Button>
+          {gmailConnected ? (
+            <div className="flex items-center gap-2 text-xs text-primary">
+              <CheckCircle2 className="h-4 w-4" />
+              Gmail forbundet
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" className="text-xs" onClick={connectGmail} disabled={connecting}>
+              {connecting ? <><Loader2 className="h-3 w-3 animate-spin" /> Forbinder...</> : "Forbind Gmail"}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="text-xs" disabled>Forbind Outlook (kommer snart)</Button>
         </div>
       </motion.div>
 
