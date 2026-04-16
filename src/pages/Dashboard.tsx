@@ -27,15 +27,15 @@ export default function Dashboard() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <motion.div {...fadeIn(0)}>
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="text-lg font-semibold">{company.name}</h1>
           <span className="text-xs font-mono text-muted-foreground">CVR {company.cvr}</span>
           <span className="text-xs text-muted-foreground">· Regnskabsår {company.fiscalYear}</span>
         </div>
       </motion.div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* KPI Cards — responsive */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {kpis.map((kpi, i) => (
           <motion.div key={kpi.label} {...fadeIn(0.05 * (i + 1))}
             className="border border-border/50 rounded bg-card p-4"
@@ -48,7 +48,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Indbakke section */}
+      {/* Indbakke section — responsive */}
       <motion.div {...fadeIn(0.25)} className="border border-border/50 rounded bg-card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold">Indbakke</h2>
@@ -56,7 +56,7 @@ export default function Dashboard() {
             Åbn indbakke <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link to="/indbakke" className="flex items-center gap-3 p-3 rounded border border-border/30 hover:border-border/60 transition-colors">
             <FileWarning className="h-4 w-4 text-warning" />
             <div>
@@ -81,11 +81,11 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* Recent entries */}
+      {/* Recent entries — responsive table */}
       <motion.div {...fadeIn(0.35)}>
         <h2 className="text-sm font-semibold mb-3">Seneste posteringer</h2>
-        <div className="border border-border/50 rounded overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="border border-border/50 rounded overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr className="border-b border-border/30 text-xs text-muted-foreground">
                 <th className="text-left p-3 font-medium">Dato</th>
