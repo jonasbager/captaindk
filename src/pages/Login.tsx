@@ -119,17 +119,6 @@ export default function Login() {
                 {signingIn ? "Logger ind..." : "Log ind med Google"}
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full h-12 gap-3 text-sm"
-                onClick={() => handleOAuth("apple")}
-                disabled={signingIn}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.569 12.625c-.022-2.269 1.851-3.358 1.935-3.41-1.052-1.539-2.691-1.75-3.275-1.775-1.394-.141-2.723.821-3.431.821-.708 0-1.803-.8-2.963-.779-1.525.022-2.931.887-3.716 2.253-1.585 2.748-.406 6.819 1.138 9.049.755 1.091 1.654 2.316 2.836 2.272 1.137-.046 1.566-.736 2.941-.736 1.375 0 1.764.736 2.966.713 1.224-.022 2.001-1.112 2.749-2.207.866-1.266 1.224-2.49 1.245-2.554-.027-.012-2.388-.917-2.412-3.638l-.013-.009zM15.286 5.77c.627-.76 1.05-1.816.935-2.87-.904.037-1.999.602-2.648 1.362-.582.673-1.091 1.748-.954 2.78.99.077 2.04-.512 2.667-1.272z"/>
-                </svg>
-                {signingIn ? "Logger ind..." : "Log ind med Microsoft"}
-              </Button>
 
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
