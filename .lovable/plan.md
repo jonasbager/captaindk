@@ -1,55 +1,69 @@
 
 
-# Captain — Full Polish & Feature Plan
+# Supabase, Auth & Inbox-scanning — Plan
 
-This is a large 10-point update touching nearly every file. Here's how I'll execute it.
+## Nuværende status
+- **Ingen Supabase** er sat op endnu — ingen database, ingen auth, ingen storage
+- Alle data er hardcoded demo-data
+- Ingen connectors linket til projektet
 
-## Files to modify
+## Hvad der skal bygges
 
-### 1. Rebrand to "Captain"
-- **index.html**: Title → "Captain — Din AI-kaptajn til bogføring", update all og/twitter meta tags
-- **src/lib/demo-data.ts**: No "Bogføring" text here, but update `chatMessages` dates and add "Nav" label support
-- **src/pages/Bilag.tsx**: Change email from `bilag.bogforing.dk` → `bilag.captain.dk`
-- **src/pages/Bogfoer.tsx**: Add "Nav" label above system message bubbles
-- **src/components/AppSidebar.tsx**: Replace "Bogføring" header text with Captain logo/icon + "Captain" text. Use Lucide `Compass` icon as the logo mark.
-- **README.md**: Full replacement (point 10)
+### 1. Aktivér Lovable Cloud (Supabase)
+- Sæt Lovable Cloud op for at få database, auth og storage
+- Opret kernetabeller: `profiles`, `user_roles`, `companies`, `journal_entries`, `documents`, `transactions`, `invoices`, `email_connections`
 
-### 2. Update all dates to 2026
-- **src/lib/demo-data.ts**: `fiscalYear: 2026`, all entry dates → `2026-04-xx`, all document/transaction dates → `2026-04-xx`, match suggestion dates → `2026-04-xx`, chat booking date → "15. april 2026"
-- **src/pages/Moms.tsx**: Restructure periods: H1 2025 betalt, H2 2025 betalt, H1 2026 åben (frist 2026-09-01)
-- **src/pages/Skat.tsx**: Reference "Regnskabsår 2025" (filing previous year)
-- **src/pages/Indstillinger.tsx**: Default date → "2026-01-01"
-- **src/pages/Posteringer.tsx**: Update hardcoded entry dates to 2026
-- **src/pages/Bogfoer.tsx**: Context panel dates → 2026
-- **src/pages/Import.tsx**: Preview row dates → 2026-04-xx
+### 2. Google & Microsoft login (SSO)
+- Aktivér Google og Apple/Microsoft som OAuth-providere i Lovable Cloud auth
+- Byg login-side med "Log ind med Google" og "Log ind med Microsoft" knapper
+- Opret `profiles`-tabel med auto-creation trigger ved signup
+- Tilføj auth-guard på alle routes undtagen login
 
-### 3. Fix Kontoplan
-- **src/pages/Kontoplan.tsx**: Complete rewrite with full account structure as specified (1000-6999 range with all accounts, SKAT-rubrik mappings, realistic balances, expandable rows showing recent posteringer)
+**Vigtigt om inbox-scanning:** Google og Microsoft SSO giver kun login-adgang. For at scanne brugeres indbakker (Gmail/Outlook) kræves **udvidede OAuth-scopes** (`gmail.readonly` / `Mail.Read`) — dette er per-bruger OAuth, ikke standard SSO.
 
-### 4. Build out CSV Import flow
-- **src/pages/Import.tsx**: Add multi-step flow (step 1: upload, step 2: preview + column mapping with dropdowns, step 3: review + approval with 4 items needing manual review)
+### 3. Per-bruger inbox-scanning (kræver custom OAuth)
+Lovable's connectors giver kun adgang til *din egen* konto. For at scanne *hver brugers* indbakke skal vi:
 
-### 5. Refine Settings
-- **src/pages/Indstillinger.tsx**: Add three new sections: Nav assistant toggles, notification toggles, plan/billing placeholder
+- **Google**: Registrere en app i Google Cloud Console med `gmail.readonly` scope, implementere OAuth-flow hvor brugeren giver adgang, gemme refresh-tokens per bruger
+- **Microsoft**: Registrere en app i Microsoft Entra med `Mail.Read` scope, samme flow
 
-### 6. Posteringer tweaks
-- **src/pages/Posteringer.tsx**: Add count header "247 posteringer i alt · 12 venter på godkendelse", ensure status badge colors are consistent
+Dette kræver:
+- En `email_connections`-tabel (user_id, provider, access_token, refresh_token, scopes, connected_at)
+- Edge functions til: OAuth callback, token refresh, inbox polling
+- En edge function der scanner indbakker for kvitteringer og opretter `documents` automatisk
 
-### 7. Indbakke polish
-- **src/pages/Indbakke.tsx**: Style keyboard hint with border/bg, add hover highlighting linking AI-forslag to matching doc/tx, update empty state to "Alle forslag behandlet. Kom tilbage senere ⚓"
+### Spørgsmål før implementering
 
-### 8. New Faktura page
-- **src/pages/Faktura.tsx**: New page with invoice creation form (kunde, fakturanr auto-increment, dato/forfaldsdato, line items with beskrivelse/antal/pris/moms, auto-total) + list of previous invoices with status badges (kladde/sendt/betalt/forfalden) + "Send via email" / "Download PDF" buttons
+Inbox-scanning med per-bruger OAuth kræver at du registrerer apps hos Google og Microsoft. Det er et større setup.
 
-### 9. Sidebar reorder
-- **src/components/AppSidebar.tsx**: Reorder nav items + add Faktura with `FileText` icon between Bogfør and Indbakke
+**Anbefalet tilgang i to trin:**
+1. **Først**: Sæt Lovable Cloud op + Google/Microsoft login + database-tabeller + auth-guard
+2. **Derefter**: Implementér inbox-scanning som separat feature (kræver Google Cloud Console + Microsoft Entra opsætning fra din side)
 
-### 10. README
-- **README.md**: Replace with the specified content
+Skal jeg starte med trin 1 (auth + database), og så tager vi inbox-scanning bagefter?
 
-### Routing
-- **src/App.tsx**: Add `/faktura` route
+## Tekniske detaljer
 
-## Execution order
-I'll work through all 10 points in a single pass, editing files in dependency order: demo-data first, then shared components (sidebar, layout), then individual pages, then README.
+### Database-tabeller (trin 1)
+```text
+profiles (id, user_id FK auth.users, full_name, avatar_url, created_at)
+user_roles (id, user_id FK auth.users, role enum(admin/user))
+companies (id, owner_id FK auth.users, name, cvr, fiscal_year_start)
+documents (id, company_id, vendor, amount, date, file_url, status, source)
+journal_entries (id, company_id, date, description, amount, account, status)
+transactions (id, company_id, date, description, amount, source, matched_document_id)
+invoices (id, company_id, customer, number, date, due_date, total, status)
+```
+
+### Auth flow
+- Login-side på `/login` med Google + Microsoft knapper
+- `AuthProvider` context wrapping hele appen
+- Protected routes via `useAuth()` hook
+- Auto-redirect til `/login` hvis ikke logget ind
+
+### Inbox-scanning (trin 2, separat)
+- Edge function `scan-inbox` kaldt via cron eller manuelt
+- Søger efter emails med vedhæftede filer (PDF, billeder)
+- Opretter `documents` med `source: 'gmail'` eller `source: 'outlook'`
+- Bruger gemte refresh-tokens til at hente emails
 
