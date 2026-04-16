@@ -96,7 +96,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 export default function Bogfoer() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(
-    initialMessages.map((m) => ({ ...m, approved: m.id === "c2" ? false : undefined }))
+    []
   );
   const scrollRef = useRef<HTMLDivElement>(null);
 

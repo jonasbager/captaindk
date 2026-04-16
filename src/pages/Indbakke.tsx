@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 export default function Indbakke() {
-  const [suggestions, setSuggestions] = useState(initialSuggestions);
-  const [documents, setDocuments] = useState(initialDocs);
-  const [transactions, setTransactions] = useState(initialTxs);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [processed, setProcessed] = useState(0);
-  const total = initialSuggestions.length;
+  const total = suggestions.length;
   const [hoveredSuggestion, setHoveredSuggestion] = useState<string | null>(null);
 
   const [draggedDocId, setDraggedDocId] = useState<string | null>(null);
