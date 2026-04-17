@@ -241,7 +241,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Update last_scanned_at on success
+    await supabase.from('email_connections')
+      .update({ last_scanned_at: nowIso, updated_at: nowIso })
+      .eq('id', connection.id)
+
     return new Response(JSON.stringify({
+      mode,
+      since: sinceIso,
       scanned: allMessages.length,
       imported: results.filter(r => r.status === 'imported').length,
       results,
