@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, Smartphone, Loader2 } from "lucide-react";
+import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, Smartphone, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { DocumentDetailDialog } from "@/components/DocumentDetailDialog";
 
 const emailAddress = "jonas.bager@bilag.captain.dk";
 
@@ -20,12 +21,23 @@ export default function Bilag() {
   const [dragOver, setDragOver] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [recentDocs, setRecentDocs] = useState<Array<{ id: string; vendor: string; date: string | null; status: string; source: string }>>([]);
+  const [recentDocs, setRecentDocs] = useState<Array<{ id: string; vendor: string; date: string | null; status: string; source: string; ocr_status: string }>>([]);
+  const [openDocId, setOpenDocId] = useState<string | null>(null);
+
+  const loadDocs = useCallback(() => {
+    supabase
+      .from("documents")
+      .select("id, vendor, date, status, source, ocr_status")
+      .in("source", ["gmail", "outlook"])
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data) setRecentDocs(data as any);
+      });
+  }, []);
 
   useEffect(() => {
     if (!session?.user) return;
-
-    // Check Gmail connection
     supabase
       .from("email_connections")
       .select("id")
@@ -33,18 +45,8 @@ export default function Bilag() {
       .eq("provider", "gmail")
       .single()
       .then(({ data }) => setGmailConnected(!!data));
-
-    // Load recent email-sourced documents (gmail + outlook)
-    supabase
-      .from("documents")
-      .select("id, vendor, date, status, source")
-      .in("source", ["gmail", "outlook"])
-      .order("created_at", { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        if (data) setRecentDocs(data);
-      });
-  }, [session]);
+    loadDocs();
+  }, [session, loadDocs]);
 
   const copyEmail = () => {
     navigator.clipboard.writeText(emailAddress);
@@ -56,9 +58,7 @@ export default function Bilag() {
     try {
       const { data, error } = await supabase.functions.invoke("gmail-auth");
       if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
-      }
+      if (data?.url) window.location.href = data.url;
     } catch (err: any) {
       toast({ title: "Fejl", description: err.message || "Kunne ikke starte Gmail-forbindelse", variant: "destructive" });
       setConnecting(false);
@@ -91,14 +91,20 @@ export default function Bilag() {
 
           {recentDocs.length > 0 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Seneste email-bilag</p>
+              <p className="text-xs text-muted-foreground mb-2">Seneste email-bilag — klik for detaljer</p>
               <div className="space-y-1.5">
                 {recentDocs.map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-3 text-xs p-2 rounded hover:bg-accent/30 transition-colors">
+                  <button
+                    key={doc.id}
+                    onClick={() => setOpenDocId(doc.id)}
+                    className="w-full flex items-center gap-3 text-xs p-2 rounded hover:bg-accent/30 transition-colors text-left"
+                  >
                     {statusIcon[doc.status as keyof typeof statusIcon] || statusIcon.venter}
                     <span className="text-muted-foreground truncate flex-1">{doc.vendor || "Ukendt"}</span>
+                    {doc.ocr_status === "processing" && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                    {doc.ocr_status === "done" && <Sparkles className="h-3 w-3 text-primary" />}
                     <span className="text-muted-foreground">{doc.date || "—"}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -156,6 +162,14 @@ export default function Bilag() {
         <p className="text-sm text-muted-foreground mb-1">Træk filer hertil eller klik for at uploade</p>
         <p className="text-xs text-muted-foreground">Billeder, PDF'er — multiple filer ad gangen</p>
       </motion.div>
+
+      <DocumentDetailDialog
+        documentId={openDocId}
+        open={!!openDocId}
+        onOpenChange={(o) => !o && setOpenDocId(null)}
+        onDeleted={loadDocs}
+        onUpdated={loadDocs}
+      />
     </div>
   );
 }
