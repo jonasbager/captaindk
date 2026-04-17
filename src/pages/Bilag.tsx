@@ -165,14 +165,24 @@ export default function Bilag() {
           variant="outline"
           size="sm"
           className="text-xs gap-1.5"
-          onClick={() => scanProvider(provider)}
+          onClick={() => scanProvider(provider, "incremental")}
           disabled={scanning === provider}
         >
           {scanning === provider ? (
             <><Loader2 className="h-3 w-3 animate-spin" /> Scanner...</>
           ) : (
-            <><RefreshCw className="h-3 w-3" /> Scan igen</>
+            <><RefreshCw className="h-3 w-3" /> Scan nye</>
           )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs"
+          onClick={() => scanProvider(provider, "full")}
+          disabled={scanning === provider}
+          title="Scan de seneste 90 dage — brug hvis du har tilføjet nye søgeord eller vil have ældre bilag med"
+        >
+          Scan 90 dage
         </Button>
         <span className="text-xs text-muted-foreground">Sidst scannet {formatRelative(conn.lastScanAt)}</span>
       </div>
