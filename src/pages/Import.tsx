@@ -29,6 +29,7 @@ export default function Import() {
   const [source, setSource] = useState("lunar");
   const [mapping, setMapping] = useState(defaultMapping);
   const [approved, setApproved] = useState<Set<number>>(new Set());
+  const [isDragging, setIsDragging] = useState(false);
 
   const updateMapping = (index: number, value: string) => {
     setMapping((prev) => prev.map((v, i) => i === index ? value : v));
@@ -40,6 +41,14 @@ export default function Import() {
 
   const approveAll = () => {
     setApproved(new Set(needsApproval.map((n) => n.id)));
+  };
+
+  const openFilePicker = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".csv,text/csv";
+    input.onchange = () => setStep(2);
+    input.click();
   };
 
   return (
@@ -66,8 +75,19 @@ export default function Import() {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="border-2 border-dashed border-border/40 rounded p-16 text-center cursor-pointer hover:border-border/60 transition-colors"
-          onClick={() => setStep(2)}
+          className={`border-2 border-dashed rounded p-16 text-center cursor-pointer transition-colors ${
+            isDragging ? "border-primary bg-primary/5" : "border-border/40 hover:border-border/60"
+          }`}
+          onClick={openFilePicker}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+            if (e.dataTransfer.files.length > 0) setStep(2);
+          }}
         >
           <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground mb-1">Træk en CSV-fil hertil eller klik for at uploade</p>
