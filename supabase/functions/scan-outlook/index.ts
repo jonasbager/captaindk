@@ -118,12 +118,14 @@ Deno.serve(async (req) => {
     // Strategy: filter only by hasAttachments + date on the server, sort by date, then filter
     // keywords client-side. Page through results to find enough keyword matches.
     const keywords = ['kvittering', 'receipt', 'faktura', 'invoice', 'bon', 'order', 'ordre', 'betalt']
-    let filter = `hasAttachments eq true`
-    if (sinceIso) filter += ` and receivedDateTime ge ${sinceIso}`
+    // Graph throws "InefficientFilter" when combining hasAttachments + $orderby + date.
+    // Only use date filter on the server (if any); filter hasAttachments + keywords client-side.
+    const filter = sinceIso ? `receivedDateTime ge ${sinceIso}` : ''
 
     const pageSize = mode === 'all' ? 100 : 50
     const maxPages = mode === 'all' ? 10 : 4
-    let url: string | null = `${GRAPH_API}/me/messages?$filter=${encodeURIComponent(filter)}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,hasAttachments`
+    const filterParam = filter ? `$filter=${encodeURIComponent(filter)}&` : ''
+    let url: string | null = `${GRAPH_API}/me/messages?${filterParam}$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,hasAttachments`
 
     const allMessages: any[] = []
     let pages = 0
