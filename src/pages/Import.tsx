@@ -179,6 +179,55 @@ export default function Import() {
     setApproved(new Set(reviewItems.map((item) => item.id)));
   };
 
+  const parseDate = (raw: string): string | null => {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const dmy = trimmed.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})/);
+    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    return null;
+  };
+
+  const handleImport = async () => {
+    if (!company || !file) {
+      toast({ title: "Ingen virksomhed", description: "Vælg en virksomhed før import.", variant: "destructive" });
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const rows = reviewItems
+        .map((item) => ({
+          company_id: company.id,
+          date: parseDate(item.date),
+          description: item.description,
+          amount: item.amount,
+          source,
+        }))
+        .filter((row): row is typeof row & { date: string } => !!row.date && row.amount !== 0);
+
+      if (rows.length === 0) {
+        toast({ title: "Ingen gyldige rækker", description: "Tjek at dato og beløb er mappet korrekt.", variant: "destructive" });
+        setImporting(false);
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("transactions").insert(rows);
+      if (insertError) throw insertError;
+
+      toast({ title: "Import gennemført", description: `${rows.length} transaktioner blev importeret.` });
+      navigate("/indbakke");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Ukendt fejl";
+      toast({ title: "Import fejlede", description: message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleFile = async (selectedFile: File) => {
     if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
       setError("Vælg en CSV-fil.");
