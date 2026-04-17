@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Compass, Send, Loader2, Building2, ArrowRight } from "lucide-react";
+import { Send, Loader2, Building2, ArrowRight } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
@@ -280,10 +281,7 @@ export default function Onboarding() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b border-border/50 px-6 py-4 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Compass className="w-5 h-5 text-primary" />
-        </div>
-        <span className="text-lg font-semibold tracking-tight">Captain</span>
+        <Logo className="h-8 w-auto" />
         <span className="text-xs text-muted-foreground ml-2">Opsætning</span>
       </div>
 
@@ -301,9 +299,7 @@ export default function Onboarding() {
               <div className={`max-w-[85%] ${msg.role === "user" ? "order-1" : ""}`}>
                 {msg.role === "captain" && (
                   <div className="flex items-center gap-2 mb-1.5">
-                    <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center">
-                      <Compass className="w-3 h-3 text-primary" />
-                    </div>
+                    <Logo className="h-4 w-auto" />
                     <span className="text-xs text-muted-foreground font-medium">Captain</span>
                   </div>
                 )}
