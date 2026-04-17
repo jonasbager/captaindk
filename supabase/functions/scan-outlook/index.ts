@@ -105,13 +105,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Search Outlook for receipt-like emails from last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const filter = `receivedDateTime ge ${sevenDaysAgo} and hasAttachments eq true`
-    const search = '"kvittering" OR "receipt" OR "invoice" OR "faktura" OR "rechnung" OR "order"'
+    // Search Outlook ONLY for emails that explicitly mention receipt/invoice keywords
+    // AND have attachments. Microsoft Graph does not allow combining $search with $filter,
+    // so we use $search and filter attachments + dedup client-side.
+    const search = '"kvittering" OR "receipt" OR "faktura" OR "invoice"'
 
     const searchRes = await fetch(
-      `${GRAPH_API}/me/messages?$filter=${encodeURIComponent(filter)}&$search=${encodeURIComponent(search)}&$top=20&$select=id,subject,from,receivedDateTime&$orderby=receivedDateTime desc`,
+      `${GRAPH_API}/me/messages?$search=${encodeURIComponent(search)}&$top=25&$select=id,subject,from,receivedDateTime,hasAttachments`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )
 
@@ -125,22 +125,24 @@ Deno.serve(async (req) => {
       })
     }
 
-    const messages = searchData.value || []
+    const allMessages = searchData.value || []
+    // Only consider messages with attachments — those are likely actual receipts/invoices
+    const messages = allMessages.filter((m: any) => m.hasAttachments === true)
     const results: Array<{ messageId: string; subject: string; from: string; status: string }> = []
 
     for (const msg of messages) {
       const subject = msg.subject || 'Ingen emne'
       const from = msg.from?.emailAddress?.address || 'Ukendt'
       const dateStr = msg.receivedDateTime
+      const fileUrl = `outlook:${msg.id}`
 
-      // Check if already imported
+      // Dedup by file_url (the unique Outlook message id)
       const { data: existing } = await supabase
         .from('documents')
         .select('id')
         .eq('company_id', company.id)
-        .eq('source', 'outlook')
-        .eq('vendor', `outlook:${msg.id}`)
-        .single()
+        .eq('file_url', fileUrl)
+        .maybeSingle()
 
       if (existing) {
         results.push({ messageId: msg.id, subject, from, status: 'already_imported' })
@@ -155,7 +157,7 @@ Deno.serve(async (req) => {
           date: dateStr ? new Date(dateStr).toISOString().split('T')[0] : null,
           source: 'outlook',
           status: 'pending',
-          file_url: `outlook:${msg.id}`,
+          file_url: fileUrl,
         })
 
       results.push({
@@ -168,6 +170,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       scanned: messages.length,
+      totalMatched: allMessages.length,
       results,
     }), {
       status: 200,

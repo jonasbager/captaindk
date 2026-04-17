@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Send, Download, FileText } from "lucide-react";
+import { Plus, Trash2, Send, Download, FileText, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatAmount } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/hooks/useCompany";
 
 interface InvoiceLine {
   id: number;
@@ -16,13 +18,15 @@ interface InvoiceLine {
   vatRate: number;
 }
 
-const existingInvoices = [
-  { id: "2026-047", customer: "Acme ApS", date: "2026-04-12", due: "2026-05-12", total: 28500, status: "sendt" as const },
-  { id: "2026-046", customer: "TechCorp A/S", date: "2026-04-07", due: "2026-05-07", total: 45000, status: "betalt" as const },
-  { id: "2026-045", customer: "Designbureauet IVS", date: "2026-03-25", due: "2026-04-25", total: 32000, status: "forfalden" as const },
-  { id: "2026-044", customer: "Webshop Nordic", date: "2026-03-18", due: "2026-04-18", total: 18500, status: "betalt" as const },
-  { id: "2026-043", customer: "StartupDK ApS", date: "2026-03-05", due: "2026-04-05", total: 12500, status: "betalt" as const },
-];
+interface InvoiceRow {
+  id: string;
+  number: number;
+  customer: string;
+  date: string;
+  due_date: string;
+  total: number;
+  status: string;
+}
 
 const statusColors: Record<string, string> = {
   kladde: "bg-muted/50 text-muted-foreground border-muted",
@@ -31,16 +35,29 @@ const statusColors: Record<string, string> = {
   forfalden: "bg-destructive/15 text-destructive border-destructive/20",
 };
 
-const customers = ["Acme ApS", "TechCorp A/S", "Designbureauet IVS", "Webshop Nordic", "StartupDK ApS"];
-
 export default function Faktura() {
+  const { company } = useCompany();
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [customer, setCustomer] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("2026-04-16");
-  const [dueDate, setDueDate] = useState("2026-05-16");
+  const today = new Date().toISOString().split("T")[0];
+  const [invoiceDate, setInvoiceDate] = useState(today);
+  const [dueDate, setDueDate] = useState(today);
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: 1, description: "", quantity: 1, price: 0, vatRate: 25 },
   ]);
+
+  useEffect(() => {
+    if (!company) return;
+    supabase
+      .from("invoices")
+      .select("id, number, customer, date, due_date, total, status")
+      .eq("company_id", company.id)
+      .order("date", { ascending: false })
+      .then(({ data }) => {
+        if (data) setInvoices(data as InvoiceRow[]);
+      });
+  }, [company]);
 
   const addLine = () => {
     setLines((prev) => [...prev, { id: Date.now(), description: "", quantity: 1, price: 0, vatRate: 25 }]);
@@ -59,7 +76,7 @@ export default function Faktura() {
   const totalVat = lines.reduce((sum, l) => sum + l.quantity * l.price * (l.vatRate / 100), 0);
   const total = subtotal + totalVat;
 
-  const nextInvoiceNumber = "2026-048";
+  const nextNumber = invoices.length > 0 ? Math.max(...invoices.map((i) => i.number)) + 1 : 1;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -78,23 +95,18 @@ export default function Faktura() {
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Opret faktura</h2>
-            <span className="text-xs font-mono text-muted-foreground">#{nextInvoiceNumber}</span>
+            <span className="text-xs font-mono text-muted-foreground">#{nextNumber}</span>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Kunde</Label>
-              <Select value={customer} onValueChange={setCustomer}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Vælg kunde..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                  <SelectItem value="__new">+ Opret ny kunde</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                value={customer}
+                onChange={(e) => setCustomer(e.target.value)}
+                placeholder="Indtast kundenavn..."
+                className="h-8 text-sm bg-background"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Fakturadato</Label>
@@ -169,10 +181,10 @@ export default function Faktura() {
           </div>
 
           <div className="flex gap-3">
-            <Button size="sm" className="text-xs gap-1.5">
+            <Button size="sm" className="text-xs gap-1.5" disabled>
               <Send className="h-3 w-3" /> Send via email
             </Button>
-            <Button size="sm" variant="outline" className="text-xs gap-1.5">
+            <Button size="sm" variant="outline" className="text-xs gap-1.5" disabled>
               <Download className="h-3 w-3" /> Download PDF
             </Button>
           </div>
@@ -180,47 +192,55 @@ export default function Faktura() {
       )}
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-        <div className="border border-border/50 rounded overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/30 text-xs text-muted-foreground">
-                <th className="text-left p-3 font-medium">Faktura</th>
-                <th className="text-left p-3 font-medium">Kunde</th>
-                <th className="text-left p-3 font-medium">Dato</th>
-                <th className="text-left p-3 font-medium">Forfald</th>
-                <th className="text-right p-3 font-medium">Beløb</th>
-                <th className="text-center p-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {existingInvoices.map((inv, i) => (
-                <motion.tr
-                  key={inv.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="border-b border-border/20 hover:bg-accent/20 transition-colors cursor-pointer"
-                >
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-mono text-xs">#{inv.id}</span>
-                    </div>
-                  </td>
-                  <td className="p-3">{inv.customer}</td>
-                  <td className="p-3 font-mono text-xs text-muted-foreground">{inv.date}</td>
-                  <td className="p-3 font-mono text-xs text-muted-foreground">{inv.due}</td>
-                  <td className="p-3 text-right font-mono text-primary">{formatAmount(inv.total)}</td>
-                  <td className="p-3 text-center">
-                    <Badge variant="outline" className={`text-[10px] ${statusColors[inv.status]}`}>
-                      {inv.status}
-                    </Badge>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {invoices.length === 0 ? (
+          <div className="border border-border/50 rounded bg-card flex flex-col items-center justify-center py-16 text-center">
+            <Inbox className="h-8 w-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm text-muted-foreground">Ingen fakturaer endnu</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Klik på "Ny faktura" for at oprette din første</p>
+          </div>
+        ) : (
+          <div className="border border-border/50 rounded overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/30 text-xs text-muted-foreground">
+                  <th className="text-left p-3 font-medium">Faktura</th>
+                  <th className="text-left p-3 font-medium">Kunde</th>
+                  <th className="text-left p-3 font-medium">Dato</th>
+                  <th className="text-left p-3 font-medium">Forfald</th>
+                  <th className="text-right p-3 font-medium">Beløb</th>
+                  <th className="text-center p-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv, i) => (
+                  <motion.tr
+                    key={inv.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="border-b border-border/20 hover:bg-accent/20 transition-colors cursor-pointer"
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-mono text-xs">#{inv.number}</span>
+                      </div>
+                    </td>
+                    <td className="p-3">{inv.customer}</td>
+                    <td className="p-3 font-mono text-xs text-muted-foreground">{inv.date}</td>
+                    <td className="p-3 font-mono text-xs text-muted-foreground">{inv.due_date}</td>
+                    <td className="p-3 text-right font-mono text-primary">{formatAmount(Number(inv.total))}</td>
+                    <td className="p-3 text-center">
+                      <Badge variant="outline" className={`text-[10px] ${statusColors[inv.status] || ""}`}>
+                        {inv.status}
+                      </Badge>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </motion.div>
     </div>
   );
