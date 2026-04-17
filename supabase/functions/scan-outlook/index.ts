@@ -114,26 +114,39 @@ Deno.serve(async (req) => {
     }
     // mode === 'all' → sinceIso stays null
 
-    // Use $filter (works with $orderby) instead of $search (which conflicts with $filter)
-    const keywords = ['kvittering', 'receipt', 'faktura', 'invoice']
-    const subjectFilter = keywords.map(k => `contains(subject,'${k}')`).join(' or ')
-    let filter = `hasAttachments eq true and (${subjectFilter})`
+    // Microsoft Graph rejects contains() + $orderby + date filter combined ("InefficientFilter").
+    // Strategy: filter only by hasAttachments + date on the server, sort by date, then filter
+    // keywords client-side. Page through results to find enough keyword matches.
+    const keywords = ['kvittering', 'receipt', 'faktura', 'invoice', 'bon', 'order', 'ordre', 'betalt']
+    let filter = `hasAttachments eq true`
     if (sinceIso) filter += ` and receivedDateTime ge ${sinceIso}`
 
-    const top = mode === 'all' ? 100 : 50
-    const url = `${GRAPH_API}/me/messages?$filter=${encodeURIComponent(filter)}&$top=${top}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,hasAttachments`
-    console.log('Outlook scan mode:', mode, 'since:', sinceIso, 'url:', url)
+    const pageSize = mode === 'all' ? 100 : 50
+    const maxPages = mode === 'all' ? 10 : 4
+    let url: string | null = `${GRAPH_API}/me/messages?$filter=${encodeURIComponent(filter)}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,hasAttachments`
 
-    const searchRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
-    const searchData = await searchRes.json()
-    if (!searchRes.ok) {
-      console.error('Outlook search failed:', searchData)
-      return new Response(JSON.stringify({ error: 'Outlook API error', details: searchData }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const allMessages: any[] = []
+    let pages = 0
+    while (url && pages < maxPages) {
+      console.log('Outlook scan page', pages + 1, 'url:', url)
+      const searchRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+      const searchData = await searchRes.json()
+      if (!searchRes.ok) {
+        console.error('Outlook search failed:', searchData)
+        return new Response(JSON.stringify({ error: 'Outlook API error', details: searchData }), {
+          status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const matched = (searchData.value || []).filter((m: any) => {
+        if (!m.hasAttachments) return false
+        const subj = (m.subject || '').toLowerCase()
+        return keywords.some(k => subj.includes(k))
       })
+      allMessages.push(...matched)
+      url = searchData['@odata.nextLink'] || null
+      pages++
     }
-
-    const allMessages = (searchData.value || []).filter((m: any) => m.hasAttachments === true)
+    console.log('Outlook scan mode:', mode, 'since:', sinceIso, 'matched:', allMessages.length)
     const results: any[] = []
 
     for (const msg of allMessages) {
