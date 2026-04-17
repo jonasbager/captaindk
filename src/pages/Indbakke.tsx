@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, FileText, CreditCard, Sparkles, GripVertical, Anchor, Inbox } from "lucide-react";
+import { CreditCard, Sparkles, GripVertical, Anchor, Inbox, FileText, Loader2, Trash2 } from "lucide-react";
 import { formatAmount } from "@/lib/format";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
+import { useToast } from "@/hooks/use-toast";
+import { DocumentDetailDialog } from "@/components/DocumentDetailDialog";
 
 interface DocRow {
   id: string;
@@ -13,6 +14,7 @@ interface DocRow {
   amount: number | null;
   date: string | null;
   source: string;
+  ocr_status: string;
 }
 
 interface TxRow {
@@ -24,22 +26,22 @@ interface TxRow {
 
 export default function Indbakke() {
   const { company } = useCompany();
+  const { toast } = useToast();
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [transactions, setTransactions] = useState<TxRow[]>([]);
-  const suggestions: any[] = []; // No AI matching yet — only show real DB data
-  const [selectedIndex] = useState(0);
-  const [processed] = useState(0);
-  const total = suggestions.length;
-
+  const [openDocId, setOpenDocId] = useState<string | null>(null);
   const [draggedDocId, setDraggedDocId] = useState<string | null>(null);
   const [dragOverTxId, setDragOverTxId] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   useEffect(() => {
     if (!company) return;
 
     supabase
       .from("documents")
-      .select("id, vendor, amount, date, source")
+      .select("id, vendor, amount, date, source, ocr_status")
       .eq("company_id", company.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
@@ -56,20 +58,48 @@ export default function Indbakke() {
       .then(({ data }) => {
         if (data) setTransactions(data as TxRow[]);
       });
-  }, [company]);
+  }, [company, refreshTick]);
+
+  // Realtime: react to OCR completing or matches happening
+  useEffect(() => {
+    if (!company) return;
+    const channel = supabase
+      .channel(`indbakke-${company.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "documents", filter: `company_id=eq.${company.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter: `company_id=eq.${company.id}` }, refresh)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [company, refresh]);
+
+  const handleDelete = async (e: React.MouseEvent, docId: string) => {
+    e.stopPropagation();
+    if (!confirm("Slet dette bilag?")) return;
+    const { data } = await supabase.from("documents").select("storage_path").eq("id", docId).maybeSingle();
+    if (data?.storage_path) await supabase.storage.from("receipts").remove([data.storage_path]);
+    const { error } = await supabase.from("documents").delete().eq("id", docId);
+    if (error) {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Slettet", description: "Bilaget er fjernet" });
+      refresh();
+    }
+  };
 
   const handleDrop = useCallback((_txId: string) => {
-    // Manual matching not yet wired to DB
     setDraggedDocId(null);
     setDragOverTxId(null);
   }, []);
+
+  const total = documents.length + transactions.length;
+  const processed = 0;
+  const suggestions: any[] = [];
 
   return (
     <div className="h-[calc(100vh-2.75rem)] flex flex-col">
       <div className="px-6 pt-4 pb-2 border-b border-border/30">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-sm font-semibold">Indbakke</h1>
-          <span className="text-xs font-mono text-muted-foreground">{processed} af {total} forslag behandlet</span>
+          <span className="text-xs font-mono text-muted-foreground">{processed} af {total} behandlet</span>
         </div>
         <Progress value={total > 0 ? (processed / total) * 100 : 0} className="h-1" />
       </div>
@@ -102,16 +132,32 @@ export default function Indbakke() {
                     draggable
                     onDragStart={() => setDraggedDocId(doc.id)}
                     onDragEnd={() => { setDraggedDocId(null); setDragOverTxId(null); }}
-                    className={`border rounded p-3 transition-colors cursor-grab active:cursor-grabbing ${
+                    onClick={() => setOpenDocId(doc.id)}
+                    className={`group border rounded p-3 transition-colors cursor-pointer ${
                       draggedDocId === doc.id ? "opacity-50" : "border-border/40 hover:border-border/70"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                        <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0 cursor-grab" />
                         <span className="text-sm font-medium truncate">{doc.vendor || "Ukendt"}</span>
+                        {doc.ocr_status === "processing" && (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
+                        )}
+                        {doc.ocr_status === "done" && (
+                          <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                        )}
                       </div>
-                      <span className="text-[10px] text-muted-foreground uppercase shrink-0 ml-2">{doc.source}</span>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <span className="text-[10px] text-muted-foreground uppercase">{doc.source}</span>
+                        <button
+                          onClick={(e) => handleDelete(e, doc.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive"
+                          aria-label="Slet bilag"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground font-mono">{doc.date || "—"}</span>
@@ -181,11 +227,19 @@ export default function Indbakke() {
           </div>
           <div className="text-center py-12 text-muted-foreground">
             <Anchor className="h-8 w-8 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">Ingen forslag endnu</p>
-            <p className="text-xs mt-1">AI-matching kommer snart ⚓</p>
+            <p className="text-sm">Ingen forslag</p>
+            <p className="text-xs mt-1">Sikre matches sker automatisk ⚓</p>
           </div>
         </div>
       </div>
+
+      <DocumentDetailDialog
+        documentId={openDocId}
+        open={!!openDocId}
+        onOpenChange={(o) => !o && setOpenDocId(null)}
+        onDeleted={refresh}
+        onUpdated={refresh}
+      />
     </div>
   );
 }

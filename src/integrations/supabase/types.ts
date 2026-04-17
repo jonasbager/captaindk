@@ -47,38 +47,71 @@ export type Database = {
       documents: {
         Row: {
           amount: number | null
+          attachment_id: string | null
           company_id: string
           created_at: string
+          currency: string | null
           date: string | null
           file_url: string | null
           id: string
+          mime_type: string | null
+          ocr_confidence: number | null
+          ocr_data: Json | null
+          ocr_status: string
+          outlook_message_id: string | null
+          received_at: string | null
           source: string
           status: string
+          storage_path: string | null
+          subject: string | null
           updated_at: string
+          vat_amount: number | null
           vendor: string | null
         }
         Insert: {
           amount?: number | null
+          attachment_id?: string | null
           company_id: string
           created_at?: string
+          currency?: string | null
           date?: string | null
           file_url?: string | null
           id?: string
+          mime_type?: string | null
+          ocr_confidence?: number | null
+          ocr_data?: Json | null
+          ocr_status?: string
+          outlook_message_id?: string | null
+          received_at?: string | null
           source?: string
           status?: string
+          storage_path?: string | null
+          subject?: string | null
           updated_at?: string
+          vat_amount?: number | null
           vendor?: string | null
         }
         Update: {
           amount?: number | null
+          attachment_id?: string | null
           company_id?: string
           created_at?: string
+          currency?: string | null
           date?: string | null
           file_url?: string | null
           id?: string
+          mime_type?: string | null
+          ocr_confidence?: number | null
+          ocr_data?: Json | null
+          ocr_status?: string
+          outlook_message_id?: string | null
+          received_at?: string | null
           source?: string
           status?: string
+          storage_path?: string | null
+          subject?: string | null
           updated_at?: string
+          vat_amount?: number | null
           vendor?: string | null
         }
         Relationships: [

@@ -8,6 +8,15 @@ const corsHeaders = {
 const MICROSOFT_TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
 const GRAPH_API = 'https://graph.microsoft.com/v1.0'
 
+const ALLOWED_MIME = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/heic',
+]
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -26,42 +35,31 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const supabaseUser = createClient(
-      SUPABASE_URL,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    )
+    const supabaseUser = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } })
 
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser()
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
     const { data: connection, error: connError } = await supabase
-      .from('email_connections')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('provider', 'outlook')
-      .single()
+      .from('email_connections').select('*').eq('user_id', user.id).eq('provider', 'outlook').single()
 
     if (connError || !connection) {
       return new Response(JSON.stringify({ error: 'Outlook not connected' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Refresh access token
     let accessToken = connection.encrypted_access_token
 
     if (connection.encrypted_refresh_token) {
@@ -76,111 +74,158 @@ Deno.serve(async (req) => {
           scope: 'openid email Mail.Read offline_access',
         }),
       })
-
       const refreshData = await refreshRes.json()
       if (refreshRes.ok && refreshData.access_token) {
         accessToken = refreshData.access_token
-        await supabase
-          .from('email_connections')
-          .update({
-            encrypted_access_token: accessToken,
-            encrypted_refresh_token: refreshData.refresh_token || connection.encrypted_refresh_token,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', connection.id)
+        await supabase.from('email_connections').update({
+          encrypted_access_token: accessToken,
+          encrypted_refresh_token: refreshData.refresh_token || connection.encrypted_refresh_token,
+          updated_at: new Date().toISOString(),
+        }).eq('id', connection.id)
       }
     }
 
-    // Get user's company
     const { data: company } = await supabase
-      .from('companies')
-      .select('id')
-      .eq('owner_id', user.id)
-      .single()
+      .from('companies').select('id').eq('owner_id', user.id).single()
 
     if (!company) {
       return new Response(JSON.stringify({ error: 'No company found' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Search Outlook ONLY for emails that explicitly mention receipt/invoice keywords
-    // AND have attachments. Microsoft Graph does not allow combining $search with $filter,
-    // so we use $search and filter attachments + dedup client-side.
     const search = '"kvittering" OR "receipt" OR "faktura" OR "invoice"'
-
     const searchRes = await fetch(
       `${GRAPH_API}/me/messages?$search=${encodeURIComponent(search)}&$top=25&$select=id,subject,from,receivedDateTime,hasAttachments`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )
-
     const searchData = await searchRes.json()
-
     if (!searchRes.ok) {
       console.error('Outlook search failed:', searchData)
       return new Response(JSON.stringify({ error: 'Outlook API error', details: searchData }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const allMessages = searchData.value || []
-    // Only consider messages with attachments — those are likely actual receipts/invoices
-    const messages = allMessages.filter((m: any) => m.hasAttachments === true)
-    const results: Array<{ messageId: string; subject: string; from: string; status: string }> = []
+    const allMessages = (searchData.value || []).filter((m: any) => m.hasAttachments === true)
+    const results: any[] = []
 
-    for (const msg of messages) {
+    for (const msg of allMessages) {
       const subject = msg.subject || 'Ingen emne'
       const from = msg.from?.emailAddress?.address || 'Ukendt'
-      const dateStr = msg.receivedDateTime
-      const fileUrl = `outlook:${msg.id}`
+      const receivedAt = msg.receivedDateTime
 
-      // Dedup by file_url (the unique Outlook message id)
-      const { data: existing } = await supabase
-        .from('documents')
-        .select('id')
-        .eq('company_id', company.id)
-        .eq('file_url', fileUrl)
-        .maybeSingle()
-
-      if (existing) {
-        results.push({ messageId: msg.id, subject, from, status: 'already_imported' })
+      // Fetch attachments for this message
+      const attRes = await fetch(
+        `${GRAPH_API}/me/messages/${msg.id}/attachments?$select=id,name,contentType,size,@odata.type`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      const attData = await attRes.json()
+      if (!attRes.ok) {
+        console.error('Attachment list failed for', msg.id, attData)
+        results.push({ messageId: msg.id, subject, status: 'error_listing_attachments' })
         continue
       }
 
-      const { error: insertError } = await supabase
-        .from('documents')
-        .insert({
-          company_id: company.id,
-          vendor: from,
-          date: dateStr ? new Date(dateStr).toISOString().split('T')[0] : null,
-          source: 'outlook',
-          status: 'pending',
-          file_url: fileUrl,
-        })
+      const fileAttachments = (attData.value || []).filter((a: any) =>
+        a['@odata.type'] === '#microsoft.graph.fileAttachment' &&
+        ALLOWED_MIME.includes((a.contentType || '').toLowerCase())
+      )
 
-      results.push({
-        messageId: msg.id,
-        subject,
-        from,
-        status: insertError ? 'error' : 'imported',
-      })
+      if (fileAttachments.length === 0) {
+        results.push({ messageId: msg.id, subject, status: 'no_supported_attachment' })
+        continue
+      }
+
+      for (const att of fileAttachments) {
+        // Dedup
+        const { data: existing } = await supabase
+          .from('documents').select('id')
+          .eq('company_id', company.id)
+          .eq('outlook_message_id', msg.id)
+          .eq('attachment_id', att.id)
+          .maybeSingle()
+
+        if (existing) {
+          results.push({ messageId: msg.id, attachmentId: att.id, status: 'already_imported' })
+          continue
+        }
+
+        // Get attachment binary content
+        const contentRes = await fetch(
+          `${GRAPH_API}/me/messages/${msg.id}/attachments/${att.id}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+        const contentJson = await contentRes.json()
+        const contentBytesB64: string | undefined = contentJson.contentBytes
+        if (!contentBytesB64) {
+          results.push({ messageId: msg.id, attachmentId: att.id, status: 'no_content' })
+          continue
+        }
+
+        const binary = Uint8Array.from(atob(contentBytesB64), c => c.charCodeAt(0))
+        const ext = (att.name || '').split('.').pop()?.toLowerCase() || 'bin'
+
+        // Insert document row first to get id
+        const { data: insertedDoc, error: insertError } = await supabase
+          .from('documents').insert({
+            company_id: company.id,
+            vendor: from,
+            date: receivedAt ? new Date(receivedAt).toISOString().split('T')[0] : null,
+            source: 'outlook',
+            status: 'pending',
+            ocr_status: 'pending',
+            outlook_message_id: msg.id,
+            attachment_id: att.id,
+            mime_type: att.contentType,
+            subject,
+            received_at: receivedAt,
+            file_url: `outlook:${msg.id}:${att.id}`,
+          })
+          .select('id').single()
+
+        if (insertError || !insertedDoc) {
+          console.error('Insert failed:', insertError)
+          results.push({ messageId: msg.id, attachmentId: att.id, status: 'insert_error' })
+          continue
+        }
+
+        const storagePath = `${company.id}/${insertedDoc.id}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('receipts').upload(storagePath, binary, {
+            contentType: att.contentType,
+            upsert: true,
+          })
+
+        if (uploadError) {
+          console.error('Upload failed:', uploadError)
+          results.push({ messageId: msg.id, attachmentId: att.id, status: 'upload_error' })
+          continue
+        }
+
+        await supabase.from('documents').update({ storage_path: storagePath }).eq('id', insertedDoc.id)
+
+        // Trigger OCR (fire-and-forget) so scan returns quickly
+        supabase.functions.invoke('extract-receipt', {
+          body: { document_id: insertedDoc.id },
+        }).catch(e => console.error('extract-receipt invoke failed:', e))
+
+        results.push({ messageId: msg.id, attachmentId: att.id, status: 'imported', documentId: insertedDoc.id })
+      }
     }
 
     return new Response(JSON.stringify({
-      scanned: messages.length,
-      totalMatched: allMessages.length,
+      scanned: allMessages.length,
+      imported: results.filter(r => r.status === 'imported').length,
       results,
     }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
     console.error('Error in scan-outlook:', error)
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })
