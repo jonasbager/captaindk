@@ -57,8 +57,8 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarContent className="pt-4">
         {!collapsed ? (
-          <div className="px-4 pb-4 mb-2 border-b border-border/30 flex items-center">
-            <Logo className="h-8 w-auto" />
+          <div className="px-4 pb-4 mb-2 border-b border-border/30 flex justify-center">
+            <Logo className="h-10 w-auto" />
           </div>
         ) : (
           <div className="flex justify-center pb-4 mb-2 border-b border-border/30">
