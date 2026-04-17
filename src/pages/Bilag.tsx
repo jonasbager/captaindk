@@ -66,25 +66,17 @@ export default function Bilag() {
     if (!session?.user) return;
     const { data } = await supabase
       .from("email_connections")
-      .select("provider, connected_at, updated_at")
+      .select("provider, connected_at, updated_at, last_scanned_at")
       .eq("user_id", session.user.id);
     if (!data) return;
     const next: Record<Provider, ConnectionState> = { gmail: initialConn, outlook: initialConn };
     for (const row of data) {
       const p = row.provider as Provider;
       if (p === "gmail" || p === "outlook") {
-        // Heuristic: use latest doc from this source as "last scan"
-        const { data: docData } = await supabase
-          .from("documents")
-          .select("created_at")
-          .eq("source", p)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
         next[p] = {
           connected: true,
           connectedAt: row.connected_at,
-          lastScanAt: docData?.created_at || row.updated_at,
+          lastScanAt: (row as any).last_scanned_at || null,
         };
       }
     }
