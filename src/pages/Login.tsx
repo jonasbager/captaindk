@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Compass, Mail, Eye, EyeOff } from "lucide-react";
+import { Mail, Eye, EyeOff } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,12 +92,7 @@ export default function Login() {
         className="w-full max-w-sm mx-auto p-8"
       >
         <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Compass className="w-6 h-6 text-primary" />
-            </div>
-            <span className="text-2xl font-semibold tracking-tight text-foreground">Captain</span>
-          </div>
+          <Logo className="h-14 w-auto" />
 
           <p className="text-muted-foreground text-sm text-center">
             {mode === "signup" ? "Opret din konto" : mode === "forgot" ? "Nulstil adgangskode" : "Din AI-kaptajn til bogføring"}

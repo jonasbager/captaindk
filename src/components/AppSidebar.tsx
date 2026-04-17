@@ -10,9 +10,9 @@ import {
   Upload,
   Plug,
   Settings,
-  Compass,
   FileText,
 } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -57,13 +57,12 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarContent className="pt-4">
         {!collapsed ? (
-          <div className="px-4 pb-4 mb-2 border-b border-border/30 flex items-center gap-2">
-            <Compass className="h-5 w-5 text-primary" />
-            <span className="text-xs font-mono tracking-widest uppercase text-muted-foreground">Captain</span>
+          <div className="px-4 pb-4 mb-2 border-b border-border/30 flex items-center">
+            <Logo className="h-8 w-auto" />
           </div>
         ) : (
           <div className="flex justify-center pb-4 mb-2 border-b border-border/30">
-            <Compass className="h-5 w-5 text-primary" />
+            <Logo className="h-6 w-auto" />
           </div>
         )}
         <SidebarGroup>
