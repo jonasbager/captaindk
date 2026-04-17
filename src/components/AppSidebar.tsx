@@ -62,7 +62,7 @@ export function AppSidebar() {
           </div>
         ) : (
           <div className="flex justify-center pb-4 mb-2 border-b border-border/30">
-            <Logo className="h-6 w-auto" />
+            <Logo variant="hat" className="h-7 w-auto" />
           </div>
         )}
         <SidebarGroup>
