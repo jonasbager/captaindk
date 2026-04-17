@@ -144,12 +144,22 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
         ) : doc ? (
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 overflow-hidden">
             {/* Preview */}
-            <div className="bg-muted/20 overflow-auto border-r border-border/30">
+            <div className="bg-muted/20 overflow-auto border-r border-border/30 min-h-[300px]">
               {fileUrl ? (
                 doc.mime_type?.startsWith("image/") ? (
                   <img src={fileUrl} alt="Bilag" className="w-full h-auto" />
                 ) : (
-                  <iframe src={fileUrl} className="w-full h-full" title="Bilag" />
+                  <object data={fileUrl} type={doc.mime_type || "application/pdf"} className="w-full h-full min-h-[600px]">
+                    <div className="h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">Forhåndsvisning kan ikke vises i browseren</p>
+                      <Button size="sm" variant="outline" className="text-xs gap-1.5" asChild>
+                        <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3 w-3" /> Åbn i ny fane
+                        </a>
+                      </Button>
+                    </div>
+                  </object>
                 )
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
