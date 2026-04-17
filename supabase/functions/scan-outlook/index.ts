@@ -94,11 +94,37 @@ Deno.serve(async (req) => {
       })
     }
 
-    const search = '"kvittering" OR "receipt" OR "faktura" OR "invoice"'
-    const searchRes = await fetch(
-      `${GRAPH_API}/me/messages?$search=${encodeURIComponent(search)}&$top=25&$select=id,subject,from,receivedDateTime,hasAttachments`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
+    // Parse mode from request body: "incremental" (default), "full" (90 days), or "all" (no date filter)
+    let mode: 'incremental' | 'full' | 'all' = 'incremental'
+    try {
+      const body = await req.json()
+      if (body?.mode === 'full' || body?.mode === 'all') mode = body.mode
+    } catch { /* no body */ }
+
+    // Determine date cutoff
+    let sinceIso: string | null = null
+    const nowIso = new Date().toISOString()
+    if (mode === 'incremental') {
+      // Use last_scanned_at, fallback to 90 days if never scanned
+      sinceIso = connection.last_scanned_at
+        ? new Date(connection.last_scanned_at).toISOString()
+        : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (mode === 'full') {
+      sinceIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    // mode === 'all' → sinceIso stays null
+
+    // Use $filter (works with $orderby) instead of $search (which conflicts with $filter)
+    const keywords = ['kvittering', 'receipt', 'faktura', 'invoice']
+    const subjectFilter = keywords.map(k => `contains(subject,'${k}')`).join(' or ')
+    let filter = `hasAttachments eq true and (${subjectFilter})`
+    if (sinceIso) filter += ` and receivedDateTime ge ${sinceIso}`
+
+    const top = mode === 'all' ? 100 : 50
+    const url = `${GRAPH_API}/me/messages?$filter=${encodeURIComponent(filter)}&$top=${top}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,hasAttachments`
+    console.log('Outlook scan mode:', mode, 'since:', sinceIso, 'url:', url)
+
+    const searchRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
     const searchData = await searchRes.json()
     if (!searchRes.ok) {
       console.error('Outlook search failed:', searchData)
@@ -215,7 +241,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Update last_scanned_at on success
+    await supabase.from('email_connections')
+      .update({ last_scanned_at: nowIso, updated_at: nowIso })
+      .eq('id', connection.id)
+
     return new Response(JSON.stringify({
+      mode,
+      since: sinceIso,
       scanned: allMessages.length,
       imported: results.filter(r => r.status === 'imported').length,
       results,

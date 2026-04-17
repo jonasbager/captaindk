@@ -66,25 +66,17 @@ export default function Bilag() {
     if (!session?.user) return;
     const { data } = await supabase
       .from("email_connections")
-      .select("provider, connected_at, updated_at")
+      .select("provider, connected_at, updated_at, last_scanned_at")
       .eq("user_id", session.user.id);
     if (!data) return;
     const next: Record<Provider, ConnectionState> = { gmail: initialConn, outlook: initialConn };
     for (const row of data) {
       const p = row.provider as Provider;
       if (p === "gmail" || p === "outlook") {
-        // Heuristic: use latest doc from this source as "last scan"
-        const { data: docData } = await supabase
-          .from("documents")
-          .select("created_at")
-          .eq("source", p)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
         next[p] = {
           connected: true,
           connectedAt: row.connected_at,
-          lastScanAt: docData?.created_at || row.updated_at,
+          lastScanAt: (row as any).last_scanned_at || null,
         };
       }
     }
@@ -114,14 +106,19 @@ export default function Bilag() {
     }
   };
 
-  const scanProvider = async (provider: Provider) => {
+  const scanProvider = async (provider: Provider, mode: "incremental" | "full" = "incremental") => {
     setScanning(provider);
     try {
       const fnName = provider === "gmail" ? "scan-inbox" : "scan-outlook";
-      const { data, error } = await supabase.functions.invoke(fnName);
+      const { data, error } = await supabase.functions.invoke(fnName, { body: { mode } });
       if (error) throw error;
-      const count = data?.scanned ?? data?.imported ?? 0;
-      toast({ title: "Scan færdig", description: `${count} ${provider === "gmail" ? "Gmail" : "Outlook"}-besked(er) behandlet` });
+      const imported = data?.imported ?? 0;
+      const scanned = data?.scanned ?? 0;
+      const label = provider === "gmail" ? "Gmail" : "Outlook";
+      toast({
+        title: "Scan færdig",
+        description: `${label}: ${scanned} mail(s) gennemset, ${imported} nye bilag importeret`,
+      });
       await loadConnections();
       loadDocs();
     } catch (err: any) {
@@ -160,14 +157,24 @@ export default function Bilag() {
           variant="outline"
           size="sm"
           className="text-xs gap-1.5"
-          onClick={() => scanProvider(provider)}
+          onClick={() => scanProvider(provider, "incremental")}
           disabled={scanning === provider}
         >
           {scanning === provider ? (
             <><Loader2 className="h-3 w-3 animate-spin" /> Scanner...</>
           ) : (
-            <><RefreshCw className="h-3 w-3" /> Scan igen</>
+            <><RefreshCw className="h-3 w-3" /> Scan nye</>
           )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs"
+          onClick={() => scanProvider(provider, "full")}
+          disabled={scanning === provider}
+          title="Scan de seneste 90 dage — brug hvis du har tilføjet nye søgeord eller vil have ældre bilag med"
+        >
+          Scan 90 dage
         </Button>
         <span className="text-xs text-muted-foreground">Sidst scannet {formatRelative(conn.lastScanAt)}</span>
       </div>
