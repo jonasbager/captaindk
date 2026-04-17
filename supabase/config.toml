@@ -1,1 +1,7 @@
 project_id = "oxxioffwasbwbsinbowi"
+
+[functions.outlook-callback]
+verify_jwt = false
+
+[functions.gmail-callback]
+verify_jwt = false
