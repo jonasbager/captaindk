@@ -34,11 +34,11 @@ export default function Bilag() {
       .single()
       .then(({ data }) => setGmailConnected(!!data));
 
-    // Load recent gmail documents
+    // Load recent email-sourced documents (gmail + outlook)
     supabase
       .from("documents")
       .select("id, vendor, date, status, source")
-      .eq("source", "gmail")
+      .in("source", ["gmail", "outlook"])
       .order("created_at", { ascending: false })
       .limit(10)
       .then(({ data }) => {
@@ -91,7 +91,7 @@ export default function Bilag() {
 
           {recentDocs.length > 0 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Seneste Gmail-bilag</p>
+              <p className="text-xs text-muted-foreground mb-2">Seneste email-bilag</p>
               <div className="space-y-1.5">
                 {recentDocs.map((doc) => (
                   <div key={doc.id} className="flex items-center gap-3 text-xs p-2 rounded hover:bg-accent/30 transition-colors">
