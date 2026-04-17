@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, Smartphone, Loader2, Sparkles } from "lucide-react";
+import { Copy, Mail, Camera, Upload, QrCode, CheckCircle2, Clock, AlertCircle, Smartphone, Loader2, Sparkles, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,12 +15,38 @@ const statusIcon = {
   fejlet: <AlertCircle className="h-3.5 w-3.5 text-destructive" />,
 };
 
+type Provider = "gmail" | "outlook";
+
+interface ConnectionState {
+  connected: boolean;
+  connectedAt: string | null;
+  lastScanAt: string | null;
+}
+
+const initialConn: ConnectionState = { connected: false, connectedAt: null, lastScanAt: null };
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "aldrig";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "lige nu";
+  if (mins < 60) return `for ${mins} min siden`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `for ${hours} t siden`;
+  const days = Math.floor(hours / 24);
+  return `for ${days} d siden`;
+}
+
 export default function Bilag() {
   const { toast } = useToast();
   const { session } = useAuth();
   const [dragOver, setDragOver] = useState(false);
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connections, setConnections] = useState<Record<Provider, ConnectionState>>({
+    gmail: initialConn,
+    outlook: initialConn,
+  });
+  const [scanning, setScanning] = useState<Provider | null>(null);
+  const [connecting, setConnecting] = useState<Provider | null>(null);
   const [recentDocs, setRecentDocs] = useState<Array<{ id: string; vendor: string; date: string | null; status: string; source: string; ocr_status: string }>>([]);
   const [openDocId, setOpenDocId] = useState<string | null>(null);
 
@@ -36,33 +62,116 @@ export default function Bilag() {
       });
   }, []);
 
+  const loadConnections = useCallback(async () => {
+    if (!session?.user) return;
+    const { data } = await supabase
+      .from("email_connections")
+      .select("provider, connected_at, updated_at")
+      .eq("user_id", session.user.id);
+    if (!data) return;
+    const next: Record<Provider, ConnectionState> = { gmail: initialConn, outlook: initialConn };
+    for (const row of data) {
+      const p = row.provider as Provider;
+      if (p === "gmail" || p === "outlook") {
+        // Heuristic: use latest doc from this source as "last scan"
+        const { data: docData } = await supabase
+          .from("documents")
+          .select("created_at")
+          .eq("source", p)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        next[p] = {
+          connected: true,
+          connectedAt: row.connected_at,
+          lastScanAt: docData?.created_at || row.updated_at,
+        };
+      }
+    }
+    setConnections(next);
+  }, [session]);
+
   useEffect(() => {
     if (!session?.user) return;
-    supabase
-      .from("email_connections")
-      .select("id")
-      .eq("user_id", session.user.id)
-      .eq("provider", "gmail")
-      .single()
-      .then(({ data }) => setGmailConnected(!!data));
+    loadConnections();
     loadDocs();
-  }, [session, loadDocs]);
+  }, [session, loadConnections, loadDocs]);
 
   const copyEmail = () => {
     navigator.clipboard.writeText(emailAddress);
     toast({ title: "Kopieret", description: "Email-adresse kopieret til udklipsholder" });
   };
 
-  const connectGmail = async () => {
-    setConnecting(true);
+  const connectProvider = async (provider: Provider) => {
+    setConnecting(provider);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-auth");
+      const { data, error } = await supabase.functions.invoke(`${provider}-auth`);
       if (error) throw error;
       if (data?.url) window.location.href = data.url;
     } catch (err: any) {
-      toast({ title: "Fejl", description: err.message || "Kunne ikke starte Gmail-forbindelse", variant: "destructive" });
-      setConnecting(false);
+      toast({ title: "Fejl", description: err.message || `Kunne ikke starte ${provider}-forbindelse`, variant: "destructive" });
+      setConnecting(null);
     }
+  };
+
+  const scanProvider = async (provider: Provider) => {
+    setScanning(provider);
+    try {
+      const fnName = provider === "gmail" ? "scan-inbox" : "scan-outlook";
+      const { data, error } = await supabase.functions.invoke(fnName);
+      if (error) throw error;
+      const count = data?.scanned ?? data?.imported ?? 0;
+      toast({ title: "Scan færdig", description: `${count} ${provider === "gmail" ? "Gmail" : "Outlook"}-besked(er) behandlet` });
+      await loadConnections();
+      loadDocs();
+    } catch (err: any) {
+      toast({ title: "Scan fejlede", description: err.message || "Ukendt fejl", variant: "destructive" });
+    } finally {
+      setScanning(null);
+    }
+  };
+
+  const renderProviderButton = (provider: Provider, label: string) => {
+    const conn = connections[provider];
+    if (!conn.connected) {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          onClick={() => connectProvider(provider)}
+          disabled={connecting === provider}
+        >
+          {connecting === provider ? (
+            <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Forbinder...</>
+          ) : (
+            `Forbind ${label}`
+          )}
+        </Button>
+      );
+    }
+    return (
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 text-xs text-primary">
+          <CheckCircle2 className="h-4 w-4" />
+          {label} forbundet
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs gap-1.5"
+          onClick={() => scanProvider(provider)}
+          disabled={scanning === provider}
+        >
+          {scanning === provider ? (
+            <><Loader2 className="h-3 w-3 animate-spin" /> Scanner...</>
+          ) : (
+            <><RefreshCw className="h-3 w-3" /> Scan igen</>
+          )}
+        </Button>
+        <span className="text-xs text-muted-foreground">Sidst scannet {formatRelative(conn.lastScanAt)}</span>
+      </div>
+    );
   };
 
   return (
@@ -135,18 +244,9 @@ export default function Bilag() {
         <p className="text-xs text-muted-foreground">
           Forbind din email-konto så systemet automatisk finder kvitteringer.
         </p>
-        <div className="flex gap-3">
-          {gmailConnected ? (
-            <div className="flex items-center gap-2 text-xs text-primary">
-              <CheckCircle2 className="h-4 w-4" />
-              Gmail forbundet
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" className="text-xs" onClick={connectGmail} disabled={connecting}>
-              {connecting ? <><Loader2 className="h-3 w-3 animate-spin" /> Forbinder...</> : "Forbind Gmail"}
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="text-xs" disabled>Forbind Outlook (kommer snart)</Button>
+        <div className="flex flex-col gap-2">
+          {renderProviderButton("gmail", "Gmail")}
+          {renderProviderButton("outlook", "Outlook")}
         </div>
       </motion.div>
 
