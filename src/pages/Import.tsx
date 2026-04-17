@@ -115,6 +115,9 @@ const noSuggestion = {
 };
 
 export default function Import() {
+  const navigate = useNavigate();
+  const { company } = useCompany();
+  const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [source, setSource] = useState("lunar");
   const [mapping, setMapping] = useState<string[]>([]);
@@ -122,6 +125,7 @@ export default function Import() {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<ParsedCsvFile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const preventFileDrop = (event: DragEvent) => {
