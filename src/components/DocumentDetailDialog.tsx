@@ -165,14 +165,15 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
                 <Field label="Dato" value={doc.date} mono />
                 <Field
                   label="Beløb"
-                  value={doc.amount != null ? `${formatAmount(Number(doc.amount))} ${doc.currency || ""}` : null}
+                  value={doc.amount != null ? formatAmount(Number(doc.amount), doc.currency) : null}
                   mono
                 />
                 <Field
-                  label="Moms"
-                  value={doc.vat_amount != null ? formatAmount(Number(doc.vat_amount)) : null}
+                  label={`Moms${doc.currency && doc.currency !== "DKK" ? ` (${doc.currency})` : ""}`}
+                  value={doc.vat_amount != null ? formatAmount(Number(doc.vat_amount), doc.currency) : null}
                   mono
                 />
+                <Field label="Valuta" value={doc.currency} />
                 <Field label="Kilde" value={doc.source} />
                 <Field
                   label="Sikkerhed"
