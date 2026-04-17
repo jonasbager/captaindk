@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Upload, FileSpreadsheet, Check, AlertCircle, ChevronRight, Pencil } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, AlertCircle, ChevronRight, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatAmount } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/hooks/useCompany";
+import { useToast } from "@/hooks/use-toast";
 
 type ParsedCsvFile = {
   fileName: string;
