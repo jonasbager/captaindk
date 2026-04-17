@@ -473,7 +473,10 @@ export default function Import() {
 
           {approved.size === reviewItems.length && reviewItems.length > 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end">
-              <Button size="sm" className="text-xs">Importér {file.rows.length} transaktioner</Button>
+              <Button size="sm" className="text-xs gap-1" onClick={handleImport} disabled={importing}>
+                {importing && <Loader2 className="h-3 w-3 animate-spin" />}
+                Importér {reviewItems.length} transaktioner
+              </Button>
             </motion.div>
           )}
         </motion.div>
