@@ -2,8 +2,10 @@ import logoColor from "@/assets/captain_logo_color.svg";
 import logoBlue from "@/assets/captain_logo_blue.svg";
 import logoWhite from "@/assets/captain_logo_white.svg";
 import logoBlack from "@/assets/captain_logo_black.svg";
+import logoHatColor from "@/assets/captain_logo_hat_color.svg";
+import logoHatBlue from "@/assets/captain_logo_hat_blue.svg";
 
-type LogoVariant = "auto" | "white" | "black";
+type LogoVariant = "auto" | "white" | "black" | "hat";
 
 interface LogoProps {
   className?: string;
@@ -13,7 +15,8 @@ interface LogoProps {
 
 /**
  * Captain logo. Default ("auto") shows full color in light mode and blue version in dark mode.
- * Use variant="white" or variant="black" for monochrome contexts (e.g. footer).
+ * variant="hat" shows the icon-only (hat) mark, also theme-aware.
+ * variant="white"/"black" for monochrome contexts (e.g. footer).
  */
 export function Logo({ className, variant = "auto", alt = "Captain" }: LogoProps) {
   if (variant === "white") {
@@ -21,6 +24,14 @@ export function Logo({ className, variant = "auto", alt = "Captain" }: LogoProps
   }
   if (variant === "black") {
     return <img src={logoBlack} alt={alt} className={className} />;
+  }
+  if (variant === "hat") {
+    return (
+      <>
+        <img src={logoHatColor} alt={alt} className={`${className ?? ""} block dark:hidden`} />
+        <img src={logoHatBlue} alt={alt} className={`${className ?? ""} hidden dark:block`} />
+      </>
+    );
   }
   return (
     <>
