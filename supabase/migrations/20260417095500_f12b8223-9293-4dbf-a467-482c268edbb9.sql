@@ -1,0 +1,1 @@
+ALTER TABLE public.email_connections ADD COLUMN IF NOT EXISTS last_scanned_at timestamptz;

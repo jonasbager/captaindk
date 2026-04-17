@@ -130,6 +130,7 @@ export type Database = {
           encrypted_access_token: string | null
           encrypted_refresh_token: string | null
           id: string
+          last_scanned_at: string | null
           provider: string
           scopes: string[] | null
           updated_at: string
@@ -140,6 +141,7 @@ export type Database = {
           encrypted_access_token?: string | null
           encrypted_refresh_token?: string | null
           id?: string
+          last_scanned_at?: string | null
           provider: string
           scopes?: string[] | null
           updated_at?: string
@@ -150,6 +152,7 @@ export type Database = {
           encrypted_access_token?: string | null
           encrypted_refresh_token?: string | null
           id?: string
+          last_scanned_at?: string | null
           provider?: string
           scopes?: string[] | null
           updated_at?: string
