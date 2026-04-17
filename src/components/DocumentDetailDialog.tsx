@@ -207,7 +207,7 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
                       <div key={i} className="flex items-center justify-between p-2 text-xs">
                         <span className="truncate">{line.description}</span>
                         <span className="font-mono shrink-0 ml-2">
-                          {line.amount != null ? formatAmount(Number(line.amount)) : "—"}
+                          {line.amount != null ? formatAmount(Number(line.amount), doc.currency) : "—"}
                         </span>
                       </div>
                     ))}
