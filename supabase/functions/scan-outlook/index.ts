@@ -156,9 +156,11 @@ Deno.serve(async (req) => {
       const from = msg.from?.emailAddress?.address || 'Ukendt'
       const receivedAt = msg.receivedDateTime
 
-      // Fetch attachments for this message
+      // Fetch attachments for this message.
+      // Note: Microsoft Graph does NOT allow @odata.type inside $select.
+      // We fetch the attachment list without that field in $select and filter by mime type.
       const attRes = await fetch(
-        `${GRAPH_API}/me/messages/${msg.id}/attachments?$select=id,name,contentType,size,@odata.type`,
+        `${GRAPH_API}/me/messages/${msg.id}/attachments?$select=id,name,contentType,size`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
       const attData = await attRes.json()
@@ -169,7 +171,6 @@ Deno.serve(async (req) => {
       }
 
       const fileAttachments = (attData.value || []).filter((a: any) =>
-        a['@odata.type'] === '#microsoft.graph.fileAttachment' &&
         ALLOWED_MIME.includes((a.contentType || '').toLowerCase())
       )
 
