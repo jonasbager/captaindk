@@ -104,34 +104,10 @@ const parseLocalizedAmount = (value: string) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
-const suggestAccount = (description: string) => {
-  const text = description.toLowerCase();
-
-  if (/amazon|shopify|simply|meta|google|anthropic|openai|stripe|adobe|figma|notion/.test(text)) {
-    return {
-      account: "3630 — Software",
-      reason: "Leverandøren ligner et software- eller abonnementskøb.",
-    };
-  }
-
-  if (/ikea|bilka|jem og fix|bauhaus|stark/.test(text)) {
-    return {
-      account: "3615 — Småanskaffelser",
-      reason: "Beskrivelsen ligner indkøb af udstyr eller mindre anskaffelser.",
-    };
-  }
-
-  if (/wolt|just eat|restaurant|cafe|coffee/.test(text)) {
-    return {
-      account: "3670 — Repræsentation",
-      reason: "Beskrivelsen tyder på måltider eller repræsentation.",
-    };
-  }
-
-  return {
-    account: "2990 — Afventer vurdering",
-    reason: "Kræver manuel kontrol før endelig kontering.",
-  };
+// Kontoforslag kommer fra rigtig AI/regel-motor — ikke implementeret endnu.
+const noSuggestion = {
+  account: "Ikke foreslået endnu",
+  reason: "Tilkobl AI-motor for at få automatisk kontoforslag.",
 };
 
 export default function Import() {
@@ -167,22 +143,21 @@ export default function Import() {
       return index >= 0 ? row[index] ?? "" : "";
     };
 
-    return file.rows.slice(0, Math.min(4, file.rows.length)).map((row, index) => {
+    return file.rows.map((row, index) => {
       const description = getValue(row, "Beskrivelse") || `Transaktion ${index + 1}`;
-      const suggestion = suggestAccount(description);
 
       return {
         id: index + 1,
         date: getValue(row, "Dato") || "—",
         description,
         amount: parseLocalizedAmount(getValue(row, "Beløb")),
-        suggestedAccount: suggestion.account,
-        aiReason: suggestion.reason,
+        suggestedAccount: noSuggestion.account,
+        aiReason: noSuggestion.reason,
       };
     });
   }, [file, mapping]);
 
-  const autoApprovedCount = file ? Math.max(file.rows.length - reviewItems.length, 0) : 0;
+  const autoApprovedCount = 0;
 
   const updateMapping = (index: number, value: string) => {
     setMapping((prev) => prev.map((item, i) => (i === index ? value : item)));
