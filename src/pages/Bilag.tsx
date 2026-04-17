@@ -114,14 +114,19 @@ export default function Bilag() {
     }
   };
 
-  const scanProvider = async (provider: Provider) => {
+  const scanProvider = async (provider: Provider, mode: "incremental" | "full" = "incremental") => {
     setScanning(provider);
     try {
       const fnName = provider === "gmail" ? "scan-inbox" : "scan-outlook";
-      const { data, error } = await supabase.functions.invoke(fnName);
+      const { data, error } = await supabase.functions.invoke(fnName, { body: { mode } });
       if (error) throw error;
-      const count = data?.scanned ?? data?.imported ?? 0;
-      toast({ title: "Scan færdig", description: `${count} ${provider === "gmail" ? "Gmail" : "Outlook"}-besked(er) behandlet` });
+      const imported = data?.imported ?? 0;
+      const scanned = data?.scanned ?? 0;
+      const label = provider === "gmail" ? "Gmail" : "Outlook";
+      toast({
+        title: "Scan færdig",
+        description: `${label}: ${scanned} mail(s) gennemset, ${imported} nye bilag importeret`,
+      });
       await loadConnections();
       loadDocs();
     } catch (err: any) {
