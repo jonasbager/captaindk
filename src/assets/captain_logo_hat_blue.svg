@@ -18,20 +18,20 @@
         fill: #cbfcc8;
       }
 
-      .cls-4 {
-        fill: #adeaa2;
-      }
-
-      .cls-5 {
-        fill: #2c8429;
-      }
-
       .cls-6 {
         clip-path: url(#clippath-1);
       }
 
       .cls-7 {
         clip-path: url(#clippath-2);
+      }
+
+      .cls-4 {
+        fill: #4cdd7f;
+      }
+
+      .cls-5 {
+        fill: #1c3728;
       }
     </style>
     <clipPath id="clippath">
