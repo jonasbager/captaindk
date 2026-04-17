@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Upload, FileSpreadsheet, Check, AlertCircle, ChevronRight, Pencil } from "lucide-react";
+import { Upload, FileSpreadsheet, Check, AlertCircle, ChevronRight, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatAmount } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/hooks/useCompany";
+import { useToast } from "@/hooks/use-toast";
 
 type ParsedCsvFile = {
   fileName: string;
@@ -111,6 +115,9 @@ const noSuggestion = {
 };
 
 export default function Import() {
+  const navigate = useNavigate();
+  const { company } = useCompany();
+  const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [source, setSource] = useState("lunar");
   const [mapping, setMapping] = useState<string[]>([]);
@@ -118,6 +125,7 @@ export default function Import() {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<ParsedCsvFile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const preventFileDrop = (event: DragEvent) => {
@@ -169,6 +177,55 @@ export default function Import() {
 
   const approveAll = () => {
     setApproved(new Set(reviewItems.map((item) => item.id)));
+  };
+
+  const parseDate = (raw: string): string | null => {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const dmy = trimmed.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})/);
+    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    return null;
+  };
+
+  const handleImport = async () => {
+    if (!company || !file) {
+      toast({ title: "Ingen virksomhed", description: "Vælg en virksomhed før import.", variant: "destructive" });
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const rows = reviewItems
+        .map((item) => ({
+          company_id: company.id,
+          date: parseDate(item.date),
+          description: item.description,
+          amount: item.amount,
+          source,
+        }))
+        .filter((row): row is typeof row & { date: string } => !!row.date && row.amount !== 0);
+
+      if (rows.length === 0) {
+        toast({ title: "Ingen gyldige rækker", description: "Tjek at dato og beløb er mappet korrekt.", variant: "destructive" });
+        setImporting(false);
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("transactions").insert(rows);
+      if (insertError) throw insertError;
+
+      toast({ title: "Import gennemført", description: `${rows.length} transaktioner blev importeret.` });
+      navigate("/indbakke");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Ukendt fejl";
+      toast({ title: "Import fejlede", description: message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleFile = async (selectedFile: File) => {
@@ -416,7 +473,10 @@ export default function Import() {
 
           {approved.size === reviewItems.length && reviewItems.length > 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end">
-              <Button size="sm" className="text-xs">Importér {file.rows.length} transaktioner</Button>
+              <Button size="sm" className="text-xs gap-1" onClick={handleImport} disabled={importing}>
+                {importing && <Loader2 className="h-3 w-3 animate-spin" />}
+                Importér {reviewItems.length} transaktioner
+              </Button>
             </motion.div>
           )}
         </motion.div>
