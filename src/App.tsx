@@ -7,7 +7,8 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { Layout } from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
-import Bogfoer from "@/pages/Bogfoer";
+import Chat from "@/pages/Chat";
+import Snap from "@/pages/Snap";
 import Indbakke from "@/pages/Indbakke";
 import Bilag from "@/pages/Bilag";
 import Skat from "@/pages/Skat";
@@ -80,9 +81,10 @@ const AppRoutes = () => (
           <RequireCompany>
             <Layout>
               <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Chat />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/bogfoer" element={<Bogfoer />} />
+                <Route path="/snap" element={<Snap />} />
+                <Route path="/bogfoer" element={<Navigate to="/" replace />} />
                 <Route path="/indbakke" element={<Indbakke />} />
                 <Route path="/faktura" element={<Faktura />} />
                 <Route path="/bilag" element={<Bilag />} />

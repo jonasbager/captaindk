@@ -11,10 +11,11 @@ import {
   Plug,
   Settings,
   FileText,
+  ChevronDown,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -26,18 +27,22 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCompany } from "@/hooks/useCompany";
 
-const navItems = [
+const primary = [
+  { title: "Chat", url: "/", icon: MessageSquare, end: true },
   { title: "Dashboard", url: "/dashboard", icon: LayoutGrid },
-  { title: "Bogfør", url: "/bogfoer", icon: MessageSquare },
   { title: "Indbakke", url: "/indbakke", icon: Inbox },
   { title: "Faktura", url: "/faktura", icon: FileText },
-  { title: "Bilag", url: "/bilag", icon: Receipt },
+];
+
+const admin = [
   { title: "Posteringer", url: "/posteringer", icon: List },
   { title: "Kontoplan", url: "/kontoplan", icon: BookOpen },
   { title: "Moms", url: "/moms", icon: Percent },
   { title: "SKAT", url: "/skat", icon: Building2 },
+  { title: "Bilag", url: "/bilag", icon: Receipt },
   { title: "Import", url: "/import", icon: Upload },
   { title: "Integrationer", url: "/integrationer", icon: Plug },
   { title: "Indstillinger", url: "/indstillinger", icon: Settings },
@@ -46,15 +51,31 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const { company } = useCompany();
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const initials = company?.name
-    ? company.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+    ? company.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : "??";
 
+  const renderItem = (item: typeof primary[number]) => (
+    <SidebarMenuItem key={item.title}>
+      <SidebarMenuButton asChild>
+        <NavLink
+          to={item.url}
+          end={item.end}
+          className="hover:bg-sidebar-accent/50 transition-colors relative"
+          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+        >
+          <item.icon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="ml-2">{item.title}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50">
+    <Sidebar collapsible="icon" className="border-r border-border/50 hidden md:flex">
       <SidebarContent className="pt-4">
         {!collapsed ? (
           <div className="px-4 pb-4 mb-2 border-b border-border/30 flex justify-center">
@@ -65,25 +86,28 @@ export function AppSidebar() {
             <Logo variant="hat" className="h-7 w-auto" />
           </div>
         )}
+
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end
-                      className="hover:bg-sidebar-accent/50 transition-colors relative"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span className="ml-2">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <SidebarMenu>{primary.map(renderItem)}</SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            {collapsed ? (
+              <SidebarMenu>{admin.map(renderItem)}</SidebarMenu>
+            ) : (
+              <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
+                <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                  <ChevronDown className={`h-3 w-3 transition-transform ${adminOpen ? "" : "-rotate-90"}`} />
+                  Admin
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenu>{admin.map(renderItem)}</SidebarMenu>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
