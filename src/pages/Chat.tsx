@@ -49,7 +49,7 @@ export default function Chat() {
             id: m.id,
             role: m.role as Msg["role"],
             content: m.content,
-            structured_data: (m.structured_data as StructuredCardData) ?? null,
+            structured_data: (m.structured_data as unknown as StructuredCardData) ?? null,
           }))
         );
       }
