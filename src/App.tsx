@@ -17,11 +17,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Waitlist />} />
-          <Route path="/admin/waitlist" element={<WaitlistAdmin />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Waitlist />} />
+            <Route path="/admin/login" element={<Login />} />
+            <Route path="/admin/waitlist" element={<WaitlistAdmin />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
