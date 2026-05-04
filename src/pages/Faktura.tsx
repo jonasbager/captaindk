@@ -81,6 +81,32 @@ export default function Faktura() {
   const [cEmail, setCEmail] = useState("");
   const [cAddress, setCAddress] = useState("");
   const [cTerms, setCTerms] = useState(14);
+  const [cvrLoading, setCvrLoading] = useState(false);
+
+  const lookupCvr = async () => {
+    if (cCvr.length !== 8) return;
+    setCvrLoading(true);
+    try {
+      // cvrapi.dk — gratis, ingen nøgle. User-Agent kræves.
+      const res = await fetch(`https://cvrapi.dk/api?search=${cCvr}&country=dk`, {
+        headers: { "User-Agent": "Captain/1.0 (captaindk.lovable.app)" },
+      });
+      if (!res.ok) throw new Error("CVR ikke fundet");
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setCName(data.name || "");
+      const addr = [data.address, [data.zipcode, data.city].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", ");
+      if (addr) setCAddress(addr);
+      if (data.email) setCEmail(data.email);
+      toast({ title: "Hentet", description: data.name });
+    } catch (e: any) {
+      toast({ title: "Kunne ikke hente CVR", description: e.message, variant: "destructive" });
+    } finally {
+      setCvrLoading(false);
+    }
+  };
 
   const refetch = useCallback(async () => {
     if (!company) return;
@@ -385,11 +411,28 @@ export default function Faktura() {
         <DialogContent>
           <DialogHeader><DialogTitle className="text-base">Ny kunde</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label className="text-xs">Navn *</Label><Input value={cName} onChange={(e) => setCName(e.target.value)} className="h-8 text-sm" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">CVR</Label><Input value={cCvr} onChange={(e) => setCCvr(e.target.value)} className="h-8 text-sm font-mono" /></div>
-              <div><Label className="text-xs">Email</Label><Input value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="h-8 text-sm" /></div>
+            <div>
+              <Label className="text-xs">CVR (hent automatisk)</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={cCvr}
+                  onChange={(e) => setCCvr(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  placeholder="12345678"
+                  className="h-8 text-sm font-mono"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={cCvr.length !== 8 || cvrLoading}
+                  onClick={lookupCvr}
+                  className="text-xs whitespace-nowrap"
+                >
+                  {cvrLoading ? "Henter…" : "Hent automatisk"}
+                </Button>
+              </div>
             </div>
+            <div><Label className="text-xs">Navn *</Label><Input value={cName} onChange={(e) => setCName(e.target.value)} className="h-8 text-sm" /></div>
+            <div><Label className="text-xs">Email</Label><Input value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="h-8 text-sm" /></div>
             <div><Label className="text-xs">Adresse</Label><Input value={cAddress} onChange={(e) => setCAddress(e.target.value)} className="h-8 text-sm" /></div>
             <div><Label className="text-xs">Standard betalingsfrist (dage)</Label><Input type="number" value={cTerms} onChange={(e) => setCTerms(parseInt(e.target.value) || 14)} className="h-8 text-sm font-mono w-24" /></div>
           </div>
