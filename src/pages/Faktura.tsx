@@ -81,6 +81,32 @@ export default function Faktura() {
   const [cEmail, setCEmail] = useState("");
   const [cAddress, setCAddress] = useState("");
   const [cTerms, setCTerms] = useState(14);
+  const [cvrLoading, setCvrLoading] = useState(false);
+
+  const lookupCvr = async () => {
+    if (cCvr.length !== 8) return;
+    setCvrLoading(true);
+    try {
+      // cvrapi.dk — gratis, ingen nøgle. User-Agent kræves.
+      const res = await fetch(`https://cvrapi.dk/api?search=${cCvr}&country=dk`, {
+        headers: { "User-Agent": "Captain/1.0 (captaindk.lovable.app)" },
+      });
+      if (!res.ok) throw new Error("CVR ikke fundet");
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setCName(data.name || "");
+      const addr = [data.address, [data.zipcode, data.city].filter(Boolean).join(" ")]
+        .filter(Boolean)
+        .join(", ");
+      if (addr) setCAddress(addr);
+      if (data.email) setCEmail(data.email);
+      toast({ title: "Hentet", description: data.name });
+    } catch (e: any) {
+      toast({ title: "Kunne ikke hente CVR", description: e.message, variant: "destructive" });
+    } finally {
+      setCvrLoading(false);
+    }
+  };
 
   const refetch = useCallback(async () => {
     if (!company) return;
