@@ -3,107 +3,13 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useCompany } from "@/hooks/useCompany";
-import { Layout } from "@/components/Layout";
-import Dashboard from "@/pages/Dashboard";
-import Chat from "@/pages/Chat";
-import Snap from "@/pages/Snap";
-import Indbakke from "@/pages/Indbakke";
-import Bilag from "@/pages/Bilag";
-import Skat from "@/pages/Skat";
-import Posteringer from "@/pages/Posteringer";
-import Kontoplan from "@/pages/Kontoplan";
-import Moms from "@/pages/Moms";
-import Import from "@/pages/Import";
-import Integrationer from "@/pages/Integrationer";
-import Indstillinger from "@/pages/Indstillinger";
-import Faktura from "@/pages/Faktura";
+import { AuthProvider } from "@/hooks/useAuth";
+import Waitlist from "@/pages/Waitlist";
+import WaitlistAdmin from "@/pages/WaitlistAdmin";
 import Login from "@/pages/Login";
-import ResetPassword from "@/pages/ResetPassword";
-import Onboarding from "@/pages/Onboarding";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function RequireCompany({ children }: { children: React.ReactNode }) {
-  const { company, loading } = useCompany();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
-      </div>
-    );
-  }
-
-  if (!company) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-const AppRoutes = () => (
-  <Routes>
-    <Route path="/login" element={<Login />} />
-    <Route path="/reset-password" element={<ResetPassword />} />
-    <Route
-      path="/onboarding"
-      element={
-        <ProtectedRoute>
-          <Onboarding />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/*"
-      element={
-        <ProtectedRoute>
-          <RequireCompany>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Chat />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/snap" element={<Snap />} />
-                <Route path="/bogfoer" element={<Navigate to="/" replace />} />
-                <Route path="/indbakke" element={<Indbakke />} />
-                <Route path="/faktura" element={<Faktura />} />
-                <Route path="/bilag" element={<Bilag />} />
-                <Route path="/skat" element={<Skat />} />
-                <Route path="/posteringer" element={<Posteringer />} />
-                <Route path="/kontoplan" element={<Kontoplan />} />
-                <Route path="/moms" element={<Moms />} />
-                <Route path="/import" element={<Import />} />
-                <Route path="/integrationer" element={<Integrationer />} />
-                <Route path="/indstillinger" element={<Indstillinger />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
-          </RequireCompany>
-        </ProtectedRoute>
-      }
-    />
-  </Routes>
-);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -112,7 +18,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <Routes>
+            <Route path="/" element={<Waitlist />} />
+            <Route path="/admin/login" element={<Login />} />
+            <Route path="/admin/waitlist" element={<WaitlistAdmin />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
