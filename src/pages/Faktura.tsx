@@ -87,13 +87,9 @@ export default function Faktura() {
     if (cCvr.length !== 8) return;
     setCvrLoading(true);
     try {
-      // cvrapi.dk — gratis, ingen nøgle. User-Agent kræves.
-      const res = await fetch(`https://cvrapi.dk/api?search=${cCvr}&country=dk`, {
-        headers: { "User-Agent": "Captain/1.0 (captaindk.lovable.app)" },
-      });
-      if (!res.ok) throw new Error("CVR ikke fundet");
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const { data, error } = await supabase.functions.invoke("cvr-lookup", { body: { cvr: cCvr } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       setCName(data.name || "");
       const addr = [data.address, [data.zipcode, data.city].filter(Boolean).join(" ")]
         .filter(Boolean)
