@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_messages: {
+        Row: {
+          attachments: Json | null
+          company_id: string
+          content: string
+          created_at: string
+          id: string
+          role: string
+          structured_data: Json | null
+          tool_calls: Json | null
+          user_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          company_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          role: string
+          structured_data?: Json | null
+          tool_calls?: Json | null
+          user_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          company_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          structured_data?: Json | null
+          tool_calls?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string
@@ -40,6 +76,42 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          address: string | null
+          company_id: string
+          created_at: string
+          cvr: string | null
+          default_payment_terms: number
+          email: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company_id: string
+          created_at?: string
+          cvr?: string | null
+          default_payment_terms?: number
+          email?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company_id?: string
+          created_at?: string
+          cvr?: string | null
+          default_payment_terms?: number
+          email?: string | null
+          id?: string
+          name?: string
           updated_at?: string
         }
         Relationships: []
@@ -165,39 +237,63 @@ export type Database = {
           company_id: string
           created_at: string
           customer: string
+          customer_id: string | null
           date: string
           due_date: string
           id: string
+          journal_entry_id: string | null
           lines: Json
           number: number
+          paid_at: string | null
+          payment_journal_entry_id: string | null
+          pdf_url: string | null
+          sent_at: string | null
           status: string
           total: number
+          total_excl_vat: number
+          total_vat: number
           updated_at: string
         }
         Insert: {
           company_id: string
           created_at?: string
           customer: string
+          customer_id?: string | null
           date: string
           due_date: string
           id?: string
+          journal_entry_id?: string | null
           lines?: Json
           number: number
+          paid_at?: string | null
+          payment_journal_entry_id?: string | null
+          pdf_url?: string | null
+          sent_at?: string | null
           status?: string
           total?: number
+          total_excl_vat?: number
+          total_vat?: number
           updated_at?: string
         }
         Update: {
           company_id?: string
           created_at?: string
           customer?: string
+          customer_id?: string | null
           date?: string
           due_date?: string
           id?: string
+          journal_entry_id?: string | null
           lines?: Json
           number?: number
+          paid_at?: string | null
+          payment_journal_entry_id?: string | null
+          pdf_url?: string | null
+          sent_at?: string | null
           status?: string
           total?: number
+          total_excl_vat?: number
+          total_vat?: number
           updated_at?: string
         }
         Relationships: [
