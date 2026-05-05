@@ -66,7 +66,7 @@ export default function Landing() {
         </h1>
 
         <p className="mt-8 text-lg md:text-2xl leading-relaxed text-foreground/80 max-w-[640px]">
-          Bogføring, faktura og regnskab. Bygget til dig der driver forretning - ikke til din bogholder. Captain er AI først, menu sidst. Skriv som du tænker, arbejd som du plejer, og lad bilagsbunken blive Captains problem.
+          Bogføring, faktura og regnskab. Bygget til dig der driver forretning - ikke til din bogholder. Du skriver, Captain klarer resten. Ingen menuer at lære, ingen konti at huske - bare din hverdag, uden bilagsbunken.
         </p>
 
         <div className="mt-12 flex flex-col sm:flex-row items-start sm:items-center gap-4">
