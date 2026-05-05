@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
+import Landing from "@/pages/Landing";
 import Waitlist from "@/pages/Waitlist";
 import WaitlistAdmin from "@/pages/WaitlistAdmin";
 import Login from "@/pages/Login";
@@ -19,7 +20,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Waitlist />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/waitlist" element={<Waitlist />} />
             <Route path="/admin/login" element={<Login />} />
             <Route path="/admin/waitlist" element={<WaitlistAdmin />} />
             <Route path="*" element={<Navigate to="/" replace />} />
