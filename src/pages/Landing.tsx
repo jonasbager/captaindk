@@ -66,10 +66,7 @@ export default function Landing() {
         </h1>
 
         <p className="mt-8 text-lg md:text-2xl leading-relaxed text-foreground/80 max-w-[640px]">
-          Bogføring, faktura og regnskab — genopfundet for folk der{" "}
-          <span className="text-foreground">ikke er bogholdere</span>. Captain
-          er AI først, menu sidst. Den taler dit sprog, kender din hverdag, og
-          lader dig blive ved med at arbejde som du plejer — bare uden bilags­bunken.
+          Bogføring, faktura og regnskab. Bygget til dig der driver forretning - ikke til din bogholder. Captain er AI først, menu sidst. Skriv som du tænker, arbejd som du plejer, og lad bilagsbunken blive Captains problem.
         </p>
 
         <div className="mt-12 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -83,7 +80,7 @@ export default function Landing() {
             </Link>
           </Button>
           <span className="text-xs text-muted-foreground">
-            Tager 8 sekunder · Ingen spam · Ingen bogholder­snak
+            Tager 8 sekunder. Ingen spam. Ingen bogholdersnak.
           </span>
         </div>
       </section>
