@@ -103,7 +103,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             {collapsed ? (
-              <SidebarMenu>{admin.map(renderItem)}</SidebarMenu>
+              <SidebarMenu>{adminItems.map(renderItem)}</SidebarMenu>
             ) : (
               <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
                 <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
@@ -111,7 +111,7 @@ export function AppSidebar() {
                   Admin
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <SidebarMenu>{admin.map(renderItem)}</SidebarMenu>
+                  <SidebarMenu>{adminItems.map(renderItem)}</SidebarMenu>
                 </CollapsibleContent>
               </Collapsible>
             )}
