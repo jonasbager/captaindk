@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Mail, Eye, EyeOff } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { motion } from "framer-motion";
@@ -7,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { useCompany } from "@/hooks/useCompany";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,8 +14,6 @@ type AuthMode = "login" | "signup" | "forgot";
 
 export default function Login() {
   const { session, loading } = useAuth();
-  const { company } = useCompany();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +70,6 @@ export default function Login() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate(company ? "/dashboard" : "/onboarding", { replace: true });
       }
     } catch (err: any) {
       setError(err.message || "Der opstod en fejl.");
