@@ -41,7 +41,7 @@ export default function Snap() {
     // Placeholder: upload + extract-receipt wired in Fase 4
     toast({ title: "Bilag modtaget", description: "OCR-pipeline kobles på i næste fase." });
     setBusy(false);
-    navigate("/");
+    navigate("/chat");
   };
 
   return (
