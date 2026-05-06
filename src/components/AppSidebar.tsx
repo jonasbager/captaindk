@@ -65,7 +65,7 @@ export function AppSidebar() {
     ? company.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : "??";
 
-  const renderItem = (item: typeof primary[number]) => (
+  const renderItem = (item: { title: string; url: string; icon: typeof primary[number]["icon"]; end?: boolean }) => (
     <SidebarMenuItem key={item.title}>
       <SidebarMenuButton asChild>
         <NavLink
