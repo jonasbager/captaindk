@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
 import { Mail, Eye, EyeOff } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { motion } from "framer-motion";
@@ -29,10 +28,6 @@ export default function Login() {
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
       </div>
     );
-  }
-
-  if (session) {
-    return <Navigate to="/admin/waitlist" replace />;
   }
 
   const handleOAuth = async (provider: "google" | "apple") => {

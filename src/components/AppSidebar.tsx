@@ -33,7 +33,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useCompany } from "@/hooks/useCompany";
 
 const primary = [
-  { title: "Chat", url: "/", icon: MessageSquare, end: true },
+  { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Dashboard", url: "/dashboard", icon: LayoutGrid },
   { title: "Indbakke", url: "/indbakke", icon: Inbox },
   { title: "Faktura", url: "/faktura", icon: FileText },
@@ -65,7 +65,7 @@ export function AppSidebar() {
     ? company.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
     : "??";
 
-  const renderItem = (item: typeof primary[number]) => (
+  const renderItem = (item: { title: string; url: string; icon: typeof primary[number]["icon"]; end?: boolean }) => (
     <SidebarMenuItem key={item.title}>
       <SidebarMenuButton asChild>
         <NavLink
