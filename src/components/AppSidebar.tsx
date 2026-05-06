@@ -33,7 +33,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useCompany } from "@/hooks/useCompany";
 
 const primary = [
-  { title: "Chat", url: "/", icon: MessageSquare, end: true },
+  { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Dashboard", url: "/dashboard", icon: LayoutGrid },
   { title: "Indbakke", url: "/indbakke", icon: Inbox },
   { title: "Faktura", url: "/faktura", icon: FileText },
