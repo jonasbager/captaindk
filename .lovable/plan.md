@@ -1,66 +1,27 @@
+## Plan
 
+### 1. Admin-rolle til jonas@bager.dk
+Jeg kan ikke oprette selve auth-brugeren fra koden (Supabase kræver at brugeren selv signer up med password). Løsningen bliver derfor todelt:
 
-# Gmail Sync — Implementeringsplan
+- **Migration**: Indsæt admin-rolle i `user_roles` for den bruger i `auth.users` der har email `jonas@bager.dk`, hvis den allerede findes.
+- **Trigger**: Udvid `handle_new_user` (eller tilføj en separat trigger) så hvis en ny bruger signer up med `jonas@bager.dk`, får de automatisk `admin` i `user_roles`.
 
-## Oversigt
+Du logger derefter ind / signer up én gang med `jonas@bager.dk` på `/login`, og er admin med det samme.
 
-Brugeren har oprettet en Google Cloud app med Gmail API-adgang og har client ID + secret klar. Vi skal nu bygge per-bruger Gmail OAuth-flow og inbox-scanning.
+### 2. Diskret login på landing page
+I `src/pages/Landing.tsx` toppen højre erstattes "Få adgang →" med to små links side om side:
+- "Log ind" → `/login`
+- "Få adgang →" → `/waitlist`
 
-## Arkitektur
+Holdes i `text-xs text-muted-foreground` så det er diskret og passer til designet.
 
-```text
-Bruger klikker "Forbind Gmail"
-  → Edge function (gmail-auth) genererer Google OAuth URL med gmail.readonly scope
-  → Bruger autoriserer i Google
-  → Callback til edge function (gmail-callback) → gemmer tokens i email_connections
-  → Edge function (scan-inbox) poller Gmail for kvitteringer → opretter documents
-```
+### 3. Sidebar-link til waitlist-admin
+I `src/components/AppSidebar.tsx` tilføjes et menupunkt "Venteliste" (icon: `Users` eller `ListChecks`) der peger på `/waitlist-admin`. Kun synligt hvis brugeren har admin-rolle - jeg laver et lille `useIsAdmin` hook der kalder `has_role` via `user_roles`-tabellen, så ikke-admins ikke ser punktet.
 
-## Trin
+### Tekniske detaljer
+- Migration: `INSERT INTO user_roles (user_id, role) SELECT id, 'admin' FROM auth.users WHERE email = 'jonas@bager.dk' ON CONFLICT DO NOTHING;`
+- Trigger på `auth.users` (after insert) der tilføjer admin-rolle hvis `NEW.email = 'jonas@bager.dk'`.
+- `useIsAdmin`: `supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role','admin').maybeSingle()`.
 
-### 1. Gem Google OAuth credentials som secrets
-- Brug `add_secret` til at bede brugeren indtaste `GOOGLE_GMAIL_CLIENT_ID` og `GOOGLE_GMAIL_CLIENT_SECRET`
-
-### 2. Opret 3 edge functions
-
-**`gmail-auth`** — Genererer Google OAuth consent URL
-- Bygger authorize-URL med scopes: `gmail.readonly`
-- Redirect URI: `https://oxxioffwasbwbsinbowi.supabase.co/functions/v1/gmail-callback`
-- Returnerer URL til frontend
-
-**`gmail-callback`** — OAuth callback handler
-- Modtager authorization code fra Google
-- Udveksler til access_token + refresh_token
-- Gemmer krypteret i `email_connections` tabellen
-- Redirecter bruger tilbage til `/integrationer` med success-besked
-
-**`scan-inbox`** — Scanner Gmail for kvitteringer
-- Henter emails med vedhæftede filer (PDF, billeder) fra de seneste 7 dage
-- Bruger refresh_token til at forny access_token
-- Opretter `documents` med `source: 'gmail'`
-- Kan kaldes manuelt eller via cron
-
-### 3. Opdater frontend
-
-**`Integrationer.tsx`** — "Forbind Gmail" knap kalder `gmail-auth` og åbner OAuth-vindue. Viser "Forbundet" status når `email_connections` har en Gmail-række.
-
-**`Bilag.tsx`** — "Forbind Gmail" knap bruger samme flow. Viser synkroniserede emails fra `documents` tabellen.
-
-### 4. Tilføj `deno.json` import map
-- Opsæt import map for edge functions med nødvendige dependencies
-
-## Filer der oprettes/ændres
-
-| Fil | Handling |
-|-----|---------|
-| `supabase/functions/gmail-auth/index.ts` | Ny |
-| `supabase/functions/gmail-callback/index.ts` | Ny |
-| `supabase/functions/scan-inbox/index.ts` | Ny |
-| `src/pages/Integrationer.tsx` | Opdater — forbind-knap + status |
-| `src/pages/Bilag.tsx` | Opdater — forbind Gmail-knap |
-
-## Sikkerhed
-- Tokens gemmes krypteret i `email_connections` (tabellen har RLS: kun egen bruger)
-- Edge functions validerer JWT fra Supabase session
-- Refresh tokens bruges server-side, aldrig eksponeret til frontend
-
+### Hvad jeg IKKE rører
+- Waitlist-formular, landing-tekst, eller eksisterende sidebar-punkter.
