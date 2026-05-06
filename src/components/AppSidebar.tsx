@@ -12,7 +12,9 @@ import {
   Settings,
   FileText,
   ChevronDown,
+  Users,
 } from "lucide-react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";
@@ -52,7 +54,12 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { company } = useCompany();
+  const { isAdmin } = useIsAdmin();
   const [adminOpen, setAdminOpen] = useState(false);
+
+  const adminItems = isAdmin
+    ? [...admin, { title: "Venteliste", url: "/waitlist-admin", icon: Users }]
+    : admin;
 
   const initials = company?.name
     ? company.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
