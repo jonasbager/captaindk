@@ -43,7 +43,7 @@ export default function Landing() {
         <Logo variant="auto" className="h-14 w-auto" />
         <div className="flex items-center gap-5">
           <Link
-            to="/login"
+            to="/admin/login"
             className="text-xs md:text-sm text-muted-foreground/70 hover:text-foreground transition-colors"
           >
             Log ind
