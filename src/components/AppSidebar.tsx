@@ -58,7 +58,14 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const { company } = useCompany();
   const { isAdmin } = useIsAdmin();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [adminOpen, setAdminOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/admin/login", { replace: true });
+  };
 
   const adminItems = isAdmin
     ? [...admin, { title: "Venteliste", url: "/waitlist-admin", icon: Users }]
