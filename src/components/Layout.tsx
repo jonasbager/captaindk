@@ -7,7 +7,7 @@ import { MobileTabBar } from "@/components/MobileTabBar";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const isChat = location.pathname === "/";
+  const isChat = location.pathname === "/chat";
   const isSnap = location.pathname === "/snap";
 
   if (isSnap) return <>{children}</>;
