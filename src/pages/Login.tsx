@@ -32,7 +32,7 @@ export default function Login() {
   }
 
   if (session) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/admin/waitlist" replace />;
   }
 
   const handleOAuth = async (provider: "google" | "apple") => {
