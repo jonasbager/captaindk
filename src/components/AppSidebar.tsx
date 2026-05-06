@@ -13,7 +13,10 @@ import {
   FileText,
   ChevronDown,
   Users,
+  LogOut,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
@@ -55,7 +58,14 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const { company } = useCompany();
   const { isAdmin } = useIsAdmin();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [adminOpen, setAdminOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/admin/login", { replace: true });
+  };
 
   const adminItems = isAdmin
     ? [...admin, { title: "Venteliste", url: "/waitlist-admin", icon: Users }]
@@ -128,10 +138,26 @@ export function AppSidebar() {
               <p className="text-xs font-medium truncate">{company?.name || "—"}</p>
               {company?.cvr && <p className="text-[10px] text-muted-foreground font-mono">CVR {company.cvr}</p>}
             </div>
+            <button
+              onClick={handleSignOut}
+              title="Log ud"
+              className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         ) : (
-          <div className="w-7 h-7 rounded bg-primary/20 text-primary flex items-center justify-center text-xs font-mono font-semibold mx-auto">
-            {initials}
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-7 h-7 rounded bg-primary/20 text-primary flex items-center justify-center text-xs font-mono font-semibold">
+              {initials}
+            </div>
+            <button
+              onClick={handleSignOut}
+              title="Log ud"
+              className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         )}
       </SidebarFooter>
