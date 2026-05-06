@@ -13,7 +13,10 @@ import {
   FileText,
   ChevronDown,
   Users,
+  LogOut,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
