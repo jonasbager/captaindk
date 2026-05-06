@@ -41,12 +41,20 @@ export default function Landing() {
       {/* Top bar */}
       <header className="relative z-10 px-6 md:px-10 pt-8 flex items-center justify-between">
         <Logo variant="auto" className="h-14 w-auto" />
-        <Link
-          to="/waitlist"
-          className="text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Få adgang →
-        </Link>
+        <div className="flex items-center gap-5">
+          <Link
+            to="/login"
+            className="text-xs md:text-sm text-muted-foreground/70 hover:text-foreground transition-colors"
+          >
+            Log ind
+          </Link>
+          <Link
+            to="/waitlist"
+            className="text-xs md:text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Få adgang →
+          </Link>
+        </div>
       </header>
 
       {/* Hero */}

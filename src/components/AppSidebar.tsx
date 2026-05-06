@@ -12,7 +12,9 @@ import {
   Settings,
   FileText,
   ChevronDown,
+  Users,
 } from "lucide-react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";
@@ -52,7 +54,12 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { company } = useCompany();
+  const { isAdmin } = useIsAdmin();
   const [adminOpen, setAdminOpen] = useState(false);
+
+  const adminItems = isAdmin
+    ? [...admin, { title: "Venteliste", url: "/waitlist-admin", icon: Users }]
+    : admin;
 
   const initials = company?.name
     ? company.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
@@ -96,7 +103,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             {collapsed ? (
-              <SidebarMenu>{admin.map(renderItem)}</SidebarMenu>
+              <SidebarMenu>{adminItems.map(renderItem)}</SidebarMenu>
             ) : (
               <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
                 <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
@@ -104,7 +111,7 @@ export function AppSidebar() {
                   Admin
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <SidebarMenu>{admin.map(renderItem)}</SidebarMenu>
+                  <SidebarMenu>{adminItems.map(renderItem)}</SidebarMenu>
                 </CollapsibleContent>
               </Collapsible>
             )}
