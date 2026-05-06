@@ -5,7 +5,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { supabase } from "@/integrations/supabase/client";
 
 const items = [
-  { to: "/", icon: MessageSquare, label: "Chat" },
+  { to: "/chat", icon: MessageSquare, label: "Chat" },
   { to: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { to: "/indbakke", icon: Inbox, label: "Indbakke", badge: true },
   { to: "/snap", icon: Camera, label: "Scan" },
@@ -34,7 +34,7 @@ export function MobileTabBar() {
         <NavLink
           key={it.to}
           to={it.to}
-          end={it.to === "/"}
+          end={it.to === "/chat"}
           className={({ isActive }) =>
             `flex flex-col items-center justify-center gap-0.5 text-[10px] relative ${
               isActive ? "text-primary" : "text-muted-foreground"
