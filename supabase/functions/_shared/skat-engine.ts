@@ -127,7 +127,7 @@ export function computeResultat(entries: EngineEntry[], from: string, to: string
   const fremmed_arbejde = line('fremmed_arbejde', 'expense')
   const andre = sum(p.filter((e) =>
     e.account_kind === 'expense' &&
-    ['andre_driftsomkostninger', 'revisor_advokat', 'repraesentation', 'boeder'].includes(e.tax_line || '')
+    ['andre_driftsomkostninger', 'revisor_advokat', 'repraesentation', 'boeder', 'salgsfremmende'].includes(e.tax_line || '')
   ).map((e) => e.net_amount))
   const afskrivninger = line('afskrivninger', 'expense')
   const renteindtaegter = line('renteindtaegter', 'revenue')
@@ -186,6 +186,16 @@ export function computeOplysningsskema(
   const w: string[] = []
   const fritaget = res.nettoomsaetning < 300000
 
+  // Rubrik 323 på det rigtige skema er "Salgsfremmende udgifter" (inkl. repræsentation),
+  // ikke en samlepost for andre driftsomkostninger.
+  const periode = entries.filter((e) => inPeriod(e, yearStart, yearEnd))
+  const salgsfremmende = sum(periode.filter((e) =>
+    e.account_kind === 'expense' && ['salgsfremmende', 'repraesentation'].includes(e.tax_line || '')
+  ).map((e) => e.net_amount))
+  const varebeholdninger = sum(entries.filter((e) =>
+    e.date <= yearEnd && e.tax_line === 'varebeholdninger'
+  ).map((e) => e.net_amount))
+
   const virk = [
     res.resultat >= 0
       ? { rubrik: '111', label: 'Overskud af virksomhed (før renter)', amount: r2(res.resultat_foer_renter) }
@@ -207,10 +217,14 @@ export function computeOplysningsskema(
         { rubrik: '320', label: 'Nettoomsætning', amount: res.nettoomsaetning },
         { rubrik: '321', label: 'Vareforbrug', amount: res.vareforbrug },
         { rubrik: '322', label: 'Fremmed arbejde / underleverandører', amount: res.fremmed_arbejde },
-        { rubrik: '323', label: 'Andre driftsomkostninger', amount: r2(res.andre_driftsomkostninger + res.afskrivninger) },
+        { rubrik: '323', label: 'Salgsfremmende udgifter (inkl. repræsentation)', amount: salgsfremmende },
+        { rubrik: '325', label: 'Ordinært resultat før afskrivninger og renter', amount: r2(res.resultat_foer_renter + res.afskrivninger) },
+        { rubrik: '326', label: 'Regnskabsmæssige afskrivninger', amount: res.afskrivninger },
+        { rubrik: '327', label: 'Regnskabsmæssigt resultat efter renter', amount: res.resultat },
+        { rubrik: '329', label: 'Varebeholdninger', amount: varebeholdninger },
+        { rubrik: '330', label: 'Anlægsaktiver', amount: bal.anlaegsaktiver },
         { rubrik: '331', label: 'Egenkapital', amount: bal.egenkapital },
         { rubrik: '332', label: 'Balancesum', amount: bal.balancesum },
-        { rubrik: '63x', label: 'Anlægsaktiver', amount: bal.anlaegsaktiver },
         { rubrik: '638', label: 'Skyldig moms (negativ = tilgodehavende)', amount: bal.skyldig_moms },
       ]
 

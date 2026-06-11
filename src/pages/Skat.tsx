@@ -8,8 +8,7 @@ import { computeOplysningsskema, computeSelskabsskat, computeAarsrapportB } from
 import { useEngineEntries, type EntryWithMeta } from "@/hooks/useEngineEntries";
 
 // Which entries back each rubrik — mirrors the engine's tax_line semantics
-const resultatLines = ["nettoomsaetning", "andre_indtaegter", "vareforbrug", "fremmed_arbejde", "andre_driftsomkostninger", "revisor_advokat", "repraesentation", "boeder", "afskrivninger"];
-const andreOmkLines = ["andre_driftsomkostninger", "revisor_advokat", "repraesentation", "boeder", "afskrivninger"];
+const resultatLines = ["nettoomsaetning", "andre_indtaegter", "vareforbrug", "fremmed_arbejde", "andre_driftsomkostninger", "revisor_advokat", "repraesentation", "boeder", "salgsfremmende", "afskrivninger"];
 
 const rubrikFilters: Record<string, (e: EntryWithMeta) => boolean> = {
   "111": (e) => resultatLines.includes(e.tax_line || ""),
@@ -19,10 +18,14 @@ const rubrikFilters: Record<string, (e: EntryWithMeta) => boolean> = {
   "320": (e) => e.tax_line === "nettoomsaetning" && e.account_kind === "revenue",
   "321": (e) => e.tax_line === "vareforbrug" && e.account_kind === "expense",
   "322": (e) => e.tax_line === "fremmed_arbejde" && e.account_kind === "expense",
-  "323": (e) => andreOmkLines.includes(e.tax_line || "") && e.account_kind === "expense",
+  "323": (e) => ["salgsfremmende", "repraesentation"].includes(e.tax_line || "") && e.account_kind === "expense",
+  "325": (e) => resultatLines.includes(e.tax_line || "") && e.tax_line !== "afskrivninger",
+  "326": (e) => e.tax_line === "afskrivninger",
+  "327": (e) => resultatLines.includes(e.tax_line || "") || ["renteindtaegter", "renteudgifter"].includes(e.tax_line || ""),
+  "329": (e) => e.tax_line === "varebeholdninger",
+  "330": (e) => e.tax_line === "anlaegsaktiver",
   "331": (e) => e.tax_line === "egenkapital",
   "332": (e) => e.tax_line === "anlaegsaktiver" || e.tax_line === "omsaetningsaktiver",
-  "63x": (e) => e.tax_line === "anlaegsaktiver",
   "638": (e) => e.tax_line === "skyldig_moms",
 };
 

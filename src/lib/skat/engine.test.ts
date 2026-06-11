@@ -156,11 +156,12 @@ describe("computeOplysningsskema (enkeltmandsvirksomhed)", () => {
     expect(skema.regnskabsoplysninger.find((r) => r.rubrik === "320")).toBeUndefined();
   });
 
-  it("omsætning over 300.000: rubrik 320-638 udfyldes", () => {
+  it("omsætning over 300.000: rubrik 320-638 udfyldes som på det rigtige skema", () => {
     const entries = [
       sale(400000),
       entry({ net_amount: 50000, account_kind: "expense", tax_line: "vareforbrug" }),
       entry({ net_amount: 30000, account_kind: "expense", tax_line: "fremmed_arbejde" }),
+      entry({ net_amount: 5000, account_kind: "expense", tax_line: "salgsfremmende" }),
       purchase(20000),
       entry({ net_amount: 10000, account_kind: "expense", tax_line: "afskrivninger" }),
     ];
@@ -170,8 +171,13 @@ describe("computeOplysningsskema (enkeltmandsvirksomhed)", () => {
     expect(get("320")).toBe(400000);
     expect(get("321")).toBe(50000);
     expect(get("322")).toBe(30000);
-    // 323 = andre driftsomkostninger + afskrivninger
-    expect(get("323")).toBe(30000);
+    // 323 = salgsfremmende udgifter (inkl. repræsentation)
+    expect(get("323")).toBe(5000);
+    // 325 = ordinært resultat FØR afskrivninger og renter
+    expect(get("325")).toBe(295000);
+    expect(get("326")).toBe(10000);
+    // 327 = regnskabsmæssigt resultat efter renter
+    expect(get("327")).toBe(285000);
   });
 
   it("overskud → rubrik 111, underskud → rubrik 112 (positivt beløb)", () => {
@@ -286,18 +292,54 @@ describe("complianceCalendar", () => {
 });
 
 // ---------------------------------------------------------------------------
-// GOLDEN TEST — den gyldne test fra implementeringsguiden.
-// Indsæt dine faktiske 2025-tal fra Dinero/årsopgørelsen og fjern .skip:
-// computeOplysningsskema på dine 2025-posteringer skal ramme præcis de tal,
-// du indberettede i april 2026.
+// GOLDEN TEST — Bager Consulting (CVR 41679182), årsregnskab 2025 fra Dinero.
+// Posteringerne er aggregeret pr. note-linje fra årsregnskabet; facit er de
+// tal Dinero opgjorde og som indgår i Regnskabsoplysninger 2025 på skat.dk.
 // ---------------------------------------------------------------------------
-describe.skip("GOLDEN: egne 2025-tal fra Dinero", () => {
-  it("rammer de indberettede rubrikker", () => {
-    const entries: EngineEntry[] = [
-      // TODO: eksportér 2025-posteringerne og indsæt dem her
-    ];
+describe("GOLDEN: Bager Consulting 2025-tal fra Dinero", () => {
+  const e2025 = (o: Partial<EngineEntry>) => entry({ date: "2025-06-30", ...o });
+  const entries: EngineEntry[] = [
+    // Note 1: Nettoomsætning (Salg til Danmark)
+    e2025({ net_amount: 411397, vat_amount: 102849.25, vat_code: "U25", account_kind: "revenue", tax_line: "nettoomsaetning" }),
+    // Note 2: Vareforbrug (Varekøb Danmark)
+    e2025({ net_amount: 32728, vat_amount: 8182, vat_code: "I25", account_kind: "expense", tax_line: "vareforbrug" }),
+    // Note 3: Salgsfremmende omkostninger i alt 13.398
+    e2025({ net_amount: 5952, account_kind: "expense", tax_line: "salgsfremmende" }),   // annoncer og reklame
+    e2025({ net_amount: 3153, vat_code: "REP", account_kind: "expense", tax_line: "repraesentation" }), // fuldt fradrag
+    e2025({ net_amount: 970, vat_code: "REP", account_kind: "expense", tax_line: "repraesentation" }),  // delvist fradrag
+    e2025({ net_amount: 3323, account_kind: "expense", tax_line: "salgsfremmende" }),   // øvrige personaleomkostninger
+    // Note 3: Andre administrationsomkostninger i alt 362.237
+    e2025({ net_amount: 362237, account_kind: "expense", tax_line: "andre_driftsomkostninger" }),
+    // Note 4: Personaleomkostninger 1.362
+    e2025({ net_amount: 1362, account_kind: "expense", tax_line: "andre_driftsomkostninger" }),
+    // Balance pr. 31-12-2025
+    e2025({ date: "2025-12-31", net_amount: 127423, account_kind: "asset", tax_line: "omsaetningsaktiver" }),
+    e2025({ date: "2025-12-31", net_amount: 21106, account_kind: "equity", tax_line: "egenkapital" }),
+  ];
+
+  it("rammer rubrikkerne fra årsregnskabet", () => {
     const skema = computeOplysningsskema(entries, "2025-01-01", "2025-12-31");
+    const get = (rubrik: string) => skema.regnskabsoplysninger.find((r) => r.rubrik === rubrik)?.amount;
+
+    // Årets resultat 1.672 — ingen afskrivninger eller renter i 2025
     const r111 = skema.virksomhedsoplysninger.find((r) => r.rubrik === "111");
-    expect(r111?.amount).toBe(0 /* TODO: dit indberettede overskud */);
+    expect(r111?.amount).toBe(1672);
+
+    expect(get("320")).toBe(411397);  // Nettoomsætning
+    expect(get("321")).toBe(32728);   // Vareforbrug
+    expect(get("323")).toBe(13398);   // Salgsfremmende (note 3-gruppen)
+    expect(get("325")).toBe(1672);    // Resultat af ordinær primær drift
+    expect(get("326")).toBe(0);       // Ingen afskrivninger
+    expect(get("327")).toBe(1672);    // Resultat efter renter (renter = 0)
+    expect(get("330")).toBe(0);       // Anlægsaktiver i alt 0
+    expect(get("331")).toBe(21106);   // Egenkapital
+    expect(get("332")).toBe(127423);  // Balancesum / AKTIVER I ALT
+  });
+
+  it("resultatopgørelsen stemmer med Dinero", () => {
+    const res = computeResultat(entries, "2025-01-01", "2025-12-31");
+    expect(res.nettoomsaetning).toBe(411397);
+    expect(res.vareforbrug).toBe(32728);
+    expect(res.resultat).toBe(1672); // Årets resultat
   });
 });
