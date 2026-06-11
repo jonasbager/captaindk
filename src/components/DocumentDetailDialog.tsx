@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
-import { Loader2, Trash2, RefreshCw, ExternalLink, FileText, Sparkles } from "lucide-react";
+import { Loader2, Trash2, RefreshCw, ExternalLink, FileText, Sparkles, BookCheck } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/hooks/useCompany";
 import { formatAmount } from "@/lib/format";
+
+interface AccountOption {
+  id: string;
+  number: number;
+  name: string;
+  vat_code: string;
+}
+
+// VAT contained in a gross amount, by account VAT code (mirrors the engine/captain-chat)
+const VAT_IN_GROSS: Record<string, number> = { U25: 0.25, I25: 0.25, REP: 0.25 };
 
 interface DocumentDetail {
   id: string;
@@ -35,11 +47,35 @@ interface Props {
 
 export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted, onUpdated }: Props) {
   const { toast } = useToast();
+  const { company } = useCompany();
   const [doc, setDoc] = useState<DocumentDetail | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [booking, setBooking] = useState(false);
+
+  useEffect(() => {
+    if (!open || !company) return;
+    supabase
+      .from("accounts")
+      .select("id, number, name, vat_code")
+      .eq("company_id", company.id)
+      .eq("kind", "expense")
+      .order("number")
+      .then(({ data }) => {
+        if (data) setAccounts(data as AccountOption[]);
+      });
+  }, [open, company]);
+
+  // Default to the AI-suggested account once both doc and accounts are loaded
+  useEffect(() => {
+    if (!doc || accounts.length === 0) return;
+    const suggested = accounts.find((a) => a.number === doc.ocr_data?.suggested_account_number);
+    setSelectedAccountId(suggested?.id || "");
+  }, [doc, accounts]);
 
   useEffect(() => {
     if (!open || !documentId) return;
@@ -87,6 +123,52 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
       toast({ title: "Fejl", description: err.message, variant: "destructive" });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleBook = async () => {
+    if (!doc || !company || doc.amount == null) return;
+    const account = accounts.find((a) => a.id === selectedAccountId);
+    if (!account) {
+      toast({ title: "Vælg konto", description: "Vælg hvilken konto bilaget skal bogføres på", variant: "destructive" });
+      return;
+    }
+    setBooking(true);
+    try {
+      const rate = VAT_IN_GROSS[account.vat_code] ?? 0;
+      const gross = Number(doc.amount);
+      const net = rate > 0 ? Math.round((gross / (1 + rate)) * 100) / 100 : gross;
+      const vat = Math.round((gross - net) * 100) / 100;
+
+      const { error: entryError } = await supabase.from("journal_entries").insert({
+        company_id: company.id,
+        date: doc.date || new Date().toISOString().slice(0, 10),
+        description: doc.vendor || doc.subject || "Bilag",
+        amount: gross,
+        net_amount: net,
+        vat_amount: vat,
+        vat_code: account.vat_code,
+        account: account.name,
+        account_number: account.number,
+        account_id: account.id,
+        has_document: true,
+        status: "godkendt",
+      });
+      if (entryError) throw entryError;
+
+      const { error: docError } = await supabase.from("documents").update({ status: "booked" }).eq("id", doc.id);
+      if (docError) throw docError;
+
+      toast({
+        title: "Bogført",
+        description: `${account.number} ${account.name} · netto ${formatAmount(net)}${vat > 0 ? ` · moms ${formatAmount(vat)}` : ""}`,
+      });
+      onUpdated?.();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Bogføring fejlede", description: err.message, variant: "destructive" });
+    } finally {
+      setBooking(false);
     }
   };
 
@@ -219,6 +301,42 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Foreslået kategori</p>
                   <Badge variant="secondary" className="text-[10px]">{doc.ocr_data.category}</Badge>
+                </div>
+              )}
+
+              {doc.status === "pending" && doc.amount != null && (
+                <div className="pt-4 border-t border-border/30 space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bogfør bilag</p>
+                  <div className="flex gap-2">
+                    <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                      <SelectTrigger className="flex-1 h-8 text-xs">
+                        <SelectValue placeholder="Vælg konto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id} className="text-xs">
+                            {a.number} {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" className="text-xs gap-1.5" onClick={handleBook} disabled={booking || !selectedAccountId}>
+                      {booking ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookCheck className="h-3 w-3" />}
+                      Bogfør
+                    </Button>
+                  </div>
+                  {selectedAccountId && (() => {
+                    const acc = accounts.find((a) => a.id === selectedAccountId);
+                    if (!acc) return null;
+                    const rate = VAT_IN_GROSS[acc.vat_code] ?? 0;
+                    const gross = Number(doc.amount);
+                    const net = rate > 0 ? Math.round((gross / (1 + rate)) * 100) / 100 : gross;
+                    return (
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        Netto {formatAmount(net)} · moms {formatAmount(gross - net)} ({acc.vat_code})
+                      </p>
+                    );
+                  })()}
                 </div>
               )}
 

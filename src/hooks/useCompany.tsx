@@ -7,6 +7,8 @@ export interface Company {
   name: string;
   cvr: string | null;
   fiscal_year_start: string;
+  company_type: string;
+  vat_period: string;
   owner_id: string;
   created_at: string;
   updated_at: string;

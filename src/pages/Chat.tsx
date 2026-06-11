@@ -61,13 +61,14 @@ export default function Chat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  const persist = async (role: "user" | "assistant", content: string) => {
+  const persist = async (role: "user" | "assistant", content: string, structured_data: StructuredCardData | null = null) => {
     if (!company || !user) return;
     await supabase.from("chat_messages").insert({
       company_id: company.id,
       user_id: user.id,
       role,
       content,
+      structured_data: structured_data as any,
     });
   };
 
@@ -90,47 +91,20 @@ export default function Chat() {
         body: JSON.stringify({ messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })) }),
       });
       if (resp.status === 429) throw new Error("For mange forespørgsler. Prøv igen om lidt.");
-      if (resp.status === 402) throw new Error("AI-credits opbrugt.");
-      if (!resp.ok || !resp.body) throw new Error("Kunne ikke kontakte Captain");
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let acc = "";
-      setMessages((p) => [...p, { role: "assistant", content: "" }]);
+      // captain-chat v2 returnerer JSON: { content, structured_data } eller { error }
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || "Kunne ikke kontakte Captain");
 
-      const upsert = (chunk: string) => {
-        acc += chunk;
-        setMessages((prev) => {
-          const c = [...prev];
-          c[c.length - 1] = { role: "assistant", content: acc };
-          return c;
-        });
+      const assistantMsg: Msg = {
+        role: "assistant",
+        content: data.content || "",
+        structured_data: data.structured_data ?? null,
       };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") { buf = ""; break; }
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) upsert(c);
-          } catch {
-            buf = line + "\n" + buf;
-            break;
-          }
-        }
+      setMessages((p) => [...p, assistantMsg]);
+      if (assistantMsg.content || assistantMsg.structured_data) {
+        persist("assistant", assistantMsg.content, assistantMsg.structured_data);
       }
-      if (acc) persist("assistant", acc);
     } catch (err: any) {
       toast({ title: "Fejl", description: err.message, variant: "destructive" });
       setMessages((p) => p.slice(0, -1));

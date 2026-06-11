@@ -22,6 +22,7 @@ const TOOL_SCHEMA = {
         date: { type: 'string', description: 'Receipt date in YYYY-MM-DD format' },
         invoice_number: { type: 'string' },
         category: { type: 'string', description: 'Suggested expense category, e.g. "Software", "Rejse", "Kontorhold"' },
+        suggested_account_number: { type: 'integer', description: 'Best matching account number from the chart of accounts provided in the system prompt' },
         line_items: {
           type: 'array',
           items: {
@@ -85,6 +86,17 @@ Deno.serve(async (req) => {
       throw new Error(`Download failed: ${dlError?.message}`)
     }
 
+    // Chart of accounts so the model can suggest where to book the expense
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('number, name, vat_code')
+      .eq('company_id', doc.company_id)
+      .eq('kind', 'expense')
+      .order('number')
+    const kontoplanText = (accounts || [])
+      .map((a) => `${a.number} ${a.name} (${a.vat_code})`)
+      .join('\n')
+
     const arrayBuf = await fileData.arrayBuffer()
     // Convert to base64 (chunked to avoid stack overflow)
     const bytes = new Uint8Array(arrayBuf)
@@ -107,7 +119,7 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a receipt/invoice data extraction expert. Extract structured data accurately. Use Danish kroner (DKK) as default currency if unclear. Dates in YYYY-MM-DD format. Return your best estimate of confidence (0-1).',
+            content: `You are a receipt/invoice data extraction expert. Extract structured data accurately. Use Danish kroner (DKK) as default currency if unclear. Dates in YYYY-MM-DD format. Return your best estimate of confidence (0-1).${kontoplanText ? `\n\nChart of accounts (pick suggested_account_number from this list):\n${kontoplanText}` : ''}`,
           },
           {
             role: 'user',

@@ -1,4 +1,4 @@
-project_id = "oxxioffwasbwbsinbowi"
+project_id = "cevmfwrcpwnyijqabspx"
 
 [functions.outlook-callback]
 verify_jwt = false
@@ -10,4 +10,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.auto-match]
+verify_jwt = false
+
+[functions.bank-callback]
+verify_jwt = false
+
+[functions.bank-sync]
 verify_jwt = false

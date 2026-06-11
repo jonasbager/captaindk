@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          company_id: string
+          created_at: string
+          energy_levy: string | null
+          id: string
+          kind: string
+          name: string
+          number: number
+          tax_line: string | null
+          updated_at: string
+          vat_code: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          energy_levy?: string | null
+          id?: string
+          kind: string
+          name: string
+          number: number
+          tax_line?: string | null
+          updated_at?: string
+          vat_code?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          energy_levy?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          number?: number
+          tax_line?: string | null
+          updated_at?: string
+          vat_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           attachments: Json | null
@@ -52,6 +99,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          company_type: string
           created_at: string
           cvr: string | null
           fiscal_year_start: string
@@ -59,8 +107,10 @@ export type Database = {
           name: string
           owner_id: string
           updated_at: string
+          vat_period: string
         }
         Insert: {
+          company_type?: string
           created_at?: string
           cvr?: string | null
           fiscal_year_start?: string
@@ -68,8 +118,10 @@ export type Database = {
           name: string
           owner_id: string
           updated_at?: string
+          vat_period?: string
         }
         Update: {
+          company_type?: string
           created_at?: string
           cvr?: string | null
           fiscal_year_start?: string
@@ -77,6 +129,7 @@ export type Database = {
           name?: string
           owner_id?: string
           updated_at?: string
+          vat_period?: string
         }
         Relationships: []
       }
@@ -309,6 +362,7 @@ export type Database = {
       journal_entries: {
         Row: {
           account: string
+          account_id: string | null
           account_number: number | null
           amount: number
           company_id: string
@@ -317,11 +371,15 @@ export type Database = {
           description: string
           has_document: boolean
           id: string
+          net_amount: number | null
           status: string
           updated_at: string
+          vat_amount: number
+          vat_code: string
         }
         Insert: {
           account: string
+          account_id?: string | null
           account_number?: number | null
           amount: number
           company_id: string
@@ -330,11 +388,15 @@ export type Database = {
           description: string
           has_document?: boolean
           id?: string
+          net_amount?: number | null
           status?: string
           updated_at?: string
+          vat_amount?: number
+          vat_code?: string
         }
         Update: {
           account?: string
+          account_id?: string | null
           account_number?: number | null
           amount?: number
           company_id?: string
@@ -343,10 +405,20 @@ export type Database = {
           description?: string
           has_document?: boolean
           id?: string
+          net_amount?: number | null
           status?: string
           updated_at?: string
+          vat_amount?: number
+          vat_code?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "journal_entries_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "journal_entries_company_id_fkey"
             columns: ["company_id"]
@@ -484,6 +556,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      seed_default_kontoplan: {
+        Args: {
+          p_company_id: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
