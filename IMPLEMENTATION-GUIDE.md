@@ -13,7 +13,7 @@ og slå Lovables auto-sync fra mens du arbejder, så den ikke overskriver).
 2. Tilføj `.env` til `.gitignore` og fjern den fra git-historik fremadrettet
    (`git rm --cached .env`). Anon-nøglen er designet til at være offentlig,
    men kun hvis RLS er vandtæt — og der er ingen grund til at friste.
-3. Hav Supabase CLI logget ind og linket: `supabase link --project-ref oxxioffwasbwbsinbowi`
+3. Hav Supabase CLI logget ind og linket: `supabase link --project-ref cevmfwrcpwnyijqabspx`
 
 ---
 
@@ -75,7 +75,7 @@ og få momstallet — uden at forlade chat-fanen. Det er chat-first-testen.
 1. Opret konto på enablebanking.com, registrér applikation:
    - `openssl genrsa -out eb_private.pem 2048 && openssl rsa -in eb_private.pem -pubout -out eb_public.pem`
    - Upload public key, notér application ID
-   - Redirect URL: `https://oxxioffwasbwbsinbowi.supabase.co/functions/v1/bank-callback`
+   - Redirect URL: `https://cevmfwrcpwnyijqabspx.supabase.co/functions/v1/bank-callback`
    - Start i sandbox ("Mock ASPSP"); søg produktionsadgang når flowet virker
 2. Kopiér migration + de tre functions + `_shared/enablebanking.ts` ind
 3. ```

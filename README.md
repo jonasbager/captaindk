@@ -16,7 +16,7 @@ Drop-in bank transaction sync. Files mirror the repo structure — copy them str
 1. **Register** at enablebanking.com → create an application.
    - Generate an RSA keypair: `openssl genrsa -out eb_private.pem 2048 && openssl rsa -in eb_private.pem -pubout -out eb_public.pem`
    - Upload the PUBLIC key to the EB control panel. Note your application ID.
-   - Register the redirect URL: `https://oxxioffwasbwbsinbowi.supabase.co/functions/v1/bank-callback`
+   - Register the redirect URL: `https://cevmfwrcpwnyijqabspx.supabase.co/functions/v1/bank-callback`
    - Start in sandbox; request production access when the flow works (they verify your use case — "bookkeeping SaaS, AIS only" is standard).
 
 2. **Secrets**:
@@ -48,7 +48,7 @@ Drop-in bank transaction sync. Files mirror the repo structure — copy them str
    ```sql
    select cron.schedule('bank-sync-nightly', '0 5 * * *', $$
      select net.http_post(
-       url := 'https://oxxioffwasbwbsinbowi.supabase.co/functions/v1/bank-sync',
+       url := 'https://cevmfwrcpwnyijqabspx.supabase.co/functions/v1/bank-sync',
        headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || current_setting('app.service_role_key')),
        body := '{}'::jsonb
      );
