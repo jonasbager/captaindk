@@ -106,26 +106,50 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Search Gmail for receipt-like emails from last 7 days
-    const sevenDaysAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
-    const query = `(subject:kvittering OR subject:receipt OR subject:invoice OR subject:faktura OR subject:rechnung OR subject:order) after:${sevenDaysAgo} has:attachment`
+    // Mode fra request body: incremental (default, siden sidste scan), full (90 dage), all (alt)
+    let mode: 'incremental' | 'full' | 'all' = 'incremental'
+    try {
+      const body = await req.json()
+      if (body?.mode === 'full' || body?.mode === 'all') mode = body.mode
+    } catch { /* no body */ }
 
-    const searchRes = await fetch(
-      `${GMAIL_API}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=20`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-
-    const searchData = await searchRes.json()
-
-    if (!searchRes.ok) {
-      console.error('Gmail search failed:', searchData)
-      return new Response(JSON.stringify({ error: 'Gmail API error', details: searchData }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const nowIso = new Date().toISOString()
+    let afterEpoch: number | null = null
+    if (mode === 'incremental') {
+      const sinceMs = connection.last_scanned_at
+        ? new Date(connection.last_scanned_at).getTime()
+        : Date.now() - 90 * 24 * 60 * 60 * 1000
+      afterEpoch = Math.floor(sinceMs / 1000)
+    } else if (mode === 'full') {
+      afterEpoch = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000)
     }
 
-    const messages = searchData.messages || []
+    const subjectQ = '(subject:kvittering OR subject:receipt OR subject:invoice OR subject:faktura OR subject:rechnung OR subject:order OR subject:ordre OR subject:bon OR subject:betalt OR subject:betaling OR subject:payment OR subject:bekræftelse OR subject:confirmation)'
+    const query = `${subjectQ} has:attachment${afterEpoch ? ` after:${afterEpoch}` : ''}`
+
+    // Gennemløb hele vinduet med pagination (Gmail filtrerer keywords/attachments server-side)
+    const messages: any[] = []
+    let pageToken: string | null = null
+    let pages = 0
+    const maxPages = mode === 'all' ? 20 : 10
+    do {
+      const pageParam: string = pageToken ? `&pageToken=${pageToken}` : ''
+      const searchRes = await fetch(
+        `${GMAIL_API}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=100${pageParam}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      const searchData = await searchRes.json()
+      if (!searchRes.ok) {
+        console.error('Gmail search failed:', searchData)
+        return new Response(JSON.stringify({ error: 'Gmail API error', details: searchData }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      messages.push(...(searchData.messages || []))
+      pageToken = searchData.nextPageToken || null
+      pages++
+    } while (pageToken && pages < maxPages)
     const results: Array<{ messageId: string; subject: string; from: string; status: string }> = []
 
     for (const msg of messages) {
@@ -143,14 +167,14 @@ Deno.serve(async (req) => {
       const from = headers.find((h: any) => h.name === 'From')?.value || 'Ukendt'
       const dateStr = headers.find((h: any) => h.name === 'Date')?.value
 
-      // Check if already imported
+      // Check if already imported — file_url bærer message-id (vendor er afsenderen)
       const { data: existing } = await supabase
         .from('documents')
         .select('id')
         .eq('company_id', company.id)
         .eq('source', 'gmail')
-        .eq('vendor', `gmail:${msg.id}`)
-        .single()
+        .eq('file_url', `gmail:${msg.id}`)
+        .maybeSingle()
 
       if (existing) {
         results.push({ messageId: msg.id, subject, from, status: 'already_imported' })
@@ -177,9 +201,17 @@ Deno.serve(async (req) => {
       })
     }
 
-    return new Response(JSON.stringify({ 
-      scanned: messages.length, 
-      results 
+    // Opdater last_scanned_at så incremental-mode virker
+    await supabase.from('email_connections')
+      .update({ last_scanned_at: nowIso, updated_at: nowIso })
+      .eq('id', connection.id)
+
+    return new Response(JSON.stringify({
+      mode,
+      examined: messages.length,
+      scanned: messages.length,
+      imported: results.filter(r => r.status === 'imported').length,
+      results
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

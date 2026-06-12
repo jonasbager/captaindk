@@ -15,11 +15,14 @@ export interface Company {
 }
 
 export function useCompany() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Afgør først company-status når session-restore er færdig — ellers melder
+    // hooket "ingen virksomhed" på cold load, og deep links bouncer via /onboarding
+    if (authLoading) return;
     if (!user) {
       setCompany(null);
       setLoading(false);
@@ -43,7 +46,7 @@ export function useCompany() {
     };
 
     fetchCompany();
-  }, [user]);
+  }, [user, authLoading]);
 
   const refetch = async () => {
     if (!user) return;

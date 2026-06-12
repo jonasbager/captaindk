@@ -174,7 +174,7 @@ export default function Integrationer() {
       if (error) throw error;
       toast({
         title: "Scanning fuldført",
-        description: `${data?.scanned || 0} emails scannet, ${data?.results?.filter((r: any) => r.status === "imported").length || 0} nye bilag importeret.`,
+        description: `${data?.examined ?? data?.scanned ?? 0} emails gennemgået, ${data?.scanned || 0} lignede kvitteringer, ${data?.imported ?? data?.results?.filter((r: any) => r.status === "imported").length ?? 0} nye bilag importeret.`,
       });
     } catch (err: any) {
       toast({ title: "Fejl", description: err.message || "Scanning fejlede", variant: "destructive" });

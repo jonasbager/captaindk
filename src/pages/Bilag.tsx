@@ -113,11 +113,12 @@ export default function Bilag() {
       const { data, error } = await supabase.functions.invoke(fnName, { body: { mode } });
       if (error) throw error;
       const imported = data?.imported ?? 0;
-      const scanned = data?.scanned ?? 0;
+      const examined = data?.examined ?? data?.scanned ?? 0;
+      const matched = data?.scanned ?? 0;
       const label = provider === "gmail" ? "Gmail" : "Outlook";
       toast({
         title: "Scan færdig",
-        description: `${label}: ${scanned} mail(s) gennemset, ${imported} nye bilag importeret`,
+        description: `${label}: ${examined} mails gennemgået, ${matched} lignede kvitteringer, ${imported} nye bilag importeret`,
       });
       await loadConnections();
       loadDocs();

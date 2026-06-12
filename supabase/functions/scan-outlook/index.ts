@@ -114,23 +114,27 @@ Deno.serve(async (req) => {
     }
     // mode === 'all' → sinceIso stays null
 
-    // Microsoft Graph rejects contains() + $orderby + date filter combined ("InefficientFilter").
-    // Strategy: filter only by hasAttachments + date on the server, sort by date, then filter
-    // keywords client-side. Page through results to find enough keyword matches.
-    const keywords = ['kvittering', 'receipt', 'faktura', 'invoice', 'bon', 'order', 'ordre', 'betalt']
-    // Graph throws "InefficientFilter" when combining hasAttachments + $orderby + date.
-    // Only use date filter on the server (if any); filter hasAttachments + keywords client-side.
-    const filter = sinceIso ? `receivedDateTime ge ${sinceIso}` : ''
+    // Graph throws "InefficientFilter" når hasAttachments + dato kombineres med $orderby —
+    // så vi filtrerer hasAttachments + dato på serveren UDEN $orderby og gennemløber HELE
+    // vinduet via nextLink (rækkefølgen er ligegyldig når vi alligevel ser det hele).
+    // Keywords matches client-side på emnefeltet.
+    const keywords = [
+      'kvittering', 'receipt', 'faktura', 'invoice', 'bon', 'order', 'ordre', 'betalt',
+      'betaling', 'payment', 'bekræftelse', 'confirmation', 'tak for dit køb', 'købsbevis',
+    ]
+    const filterParts = ['hasAttachments eq true']
+    if (sinceIso) filterParts.push(`receivedDateTime ge ${sinceIso}`)
+    const filter = filterParts.join(' and ')
 
-    const pageSize = mode === 'all' ? 100 : 50
-    const maxPages = mode === 'all' ? 10 : 4
-    const filterParam = filter ? `$filter=${encodeURIComponent(filter)}&` : ''
-    let url: string | null = `${GRAPH_API}/me/messages?${filterParam}$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,hasAttachments`
+    const pageSize = 100
+    const maxPages = mode === 'all' ? 50 : 25  // op til 5.000/2.500 vedhæftnings-mails
+    let url: string | null = `${GRAPH_API}/me/messages?$filter=${encodeURIComponent(filter)}&$top=${pageSize}&$select=id,subject,from,receivedDateTime,hasAttachments`
 
     const allMessages: any[] = []
+    let examined = 0
     let pages = 0
     while (url && pages < maxPages) {
-      console.log('Outlook scan page', pages + 1, 'url:', url)
+      console.log('Outlook scan page', pages + 1)
       const searchRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
       const searchData = await searchRes.json()
       if (!searchRes.ok) {
@@ -139,8 +143,9 @@ Deno.serve(async (req) => {
           status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
-      const matched = (searchData.value || []).filter((m: any) => {
-        if (!m.hasAttachments) return false
+      const batch = searchData.value || []
+      examined += batch.length
+      const matched = batch.filter((m: any) => {
         const subj = (m.subject || '').toLowerCase()
         return keywords.some(k => subj.includes(k))
       })
@@ -148,7 +153,7 @@ Deno.serve(async (req) => {
       url = searchData['@odata.nextLink'] || null
       pages++
     }
-    console.log('Outlook scan mode:', mode, 'since:', sinceIso, 'matched:', allMessages.length)
+    console.log('Outlook scan mode:', mode, 'since:', sinceIso, 'examined:', examined, 'matched:', allMessages.length)
     const results: any[] = []
 
     for (const msg of allMessages) {
@@ -265,6 +270,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       mode,
       since: sinceIso,
+      examined,
       scanned: allMessages.length,
       imported: results.filter(r => r.status === 'imported').length,
       results,
