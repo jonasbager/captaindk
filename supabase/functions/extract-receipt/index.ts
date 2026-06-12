@@ -5,39 +5,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
+const MODEL = Deno.env.get('CAPTAIN_MODEL') || 'claude-opus-4-8'
 
-const TOOL_SCHEMA = {
-  type: 'function',
-  function: {
-    name: 'extract_receipt',
-    description: 'Extract structured data from a receipt or invoice',
-    parameters: {
-      type: 'object',
-      properties: {
-        vendor: { type: 'string', description: 'Name of the supplier/vendor/company that issued the receipt' },
-        amount: { type: 'number', description: 'Total amount including VAT' },
-        vat_amount: { type: 'number', description: 'VAT (moms) amount in DKK or original currency' },
-        currency: { type: 'string', description: '3-letter currency code (DKK, EUR, USD…)' },
-        date: { type: 'string', description: 'Receipt date in YYYY-MM-DD format' },
-        invoice_number: { type: 'string' },
-        category: { type: 'string', description: 'Suggested expense category, e.g. "Software", "Rejse", "Kontorhold"' },
-        suggested_account_number: { type: 'integer', description: 'Best matching account number from the chart of accounts provided in the system prompt' },
-        line_items: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              description: { type: 'string' },
-              amount: { type: 'number' },
-            },
+// Klassifikation FØRST: mails med vedhæftninger indeholder også returlabels,
+// handelsbetingelser, billetter osv. — kun rigtige kvitteringer/fakturaer må
+// lande i Indbakken. Ikke-kvitteringer markeres status='rejected'.
+const TOOL = {
+  name: 'extract_receipt',
+  description: 'Classify the document and, if it is a receipt or invoice, extract structured data from it',
+  input_schema: {
+    type: 'object',
+    properties: {
+      document_type: {
+        type: 'string',
+        enum: ['receipt', 'invoice', 'return_label', 'shipping_label', 'terms_or_policy', 'ticket_or_boardingpass', 'newsletter_or_marketing', 'other'],
+        description: 'What this document actually is. Only receipt and invoice are bookkeeping material.',
+      },
+      classification_reason: { type: 'string', description: 'One short sentence explaining the classification' },
+      vendor: { type: 'string', description: 'Name of the supplier/vendor/company that issued the receipt' },
+      amount: { type: 'number', description: 'Total amount including VAT' },
+      vat_amount: { type: 'number', description: 'VAT (moms) amount in DKK or original currency' },
+      currency: { type: 'string', description: '3-letter currency code (DKK, EUR, USD…)' },
+      date: { type: 'string', description: 'Receipt date in YYYY-MM-DD format' },
+      invoice_number: { type: 'string' },
+      category: { type: 'string', description: 'Suggested expense category, e.g. "Software", "Rejse", "Kontorhold"' },
+      suggested_account_number: { type: 'integer', description: 'Best matching account number from the chart of accounts provided in the system prompt' },
+      line_items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            description: { type: 'string' },
+            amount: { type: 'number' },
           },
         },
-        confidence: { type: 'number', description: 'Confidence score 0-1' },
       },
-      required: ['vendor', 'amount', 'currency', 'date', 'confidence'],
-      additionalProperties: false,
+      confidence: { type: 'number', description: 'Confidence score 0-1 for the extraction (or the classification if not a receipt)' },
     },
+    required: ['document_type', 'classification_reason', 'confidence'],
   },
 }
 
@@ -47,9 +53,9 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured')
+    if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured')
 
     const { document_id } = await req.json()
     if (!document_id) {
@@ -106,59 +112,76 @@ Deno.serve(async (req) => {
       binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK) as any)
     }
     const base64 = btoa(binary)
-    const dataUrl = `data:${doc.mime_type || 'application/pdf'};base64,${base64}`
 
-    const aiRes = await fetch(GATEWAY_URL, {
+    const mime = (doc.mime_type || 'application/pdf').toLowerCase()
+    const fileBlock = mime === 'application/pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+      : { type: 'image', source: { type: 'base64', media_type: mime === 'image/jpg' ? 'image/jpeg' : mime, data: base64 } }
+
+    const aiRes = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: MODEL,
+        max_tokens: 2000,
+        system: `You are a bookkeeping document classifier and extractor for a Danish company.
+
+FIRST classify what the document actually is. Emails matching receipt keywords often carry attachments that are NOT bookkeeping material: return labels, shipping labels, terms & conditions, boarding passes, marketing one-pagers. Only classify as 'receipt' or 'invoice' when the document shows an actual purchase with amounts the company paid or owes.
+
+If (and only if) it is a receipt or invoice, extract structured data accurately. Use Danish kroner (DKK) as default currency if unclear. Dates in YYYY-MM-DD format. Return your best estimate of confidence (0-1).${kontoplanText ? `\n\nChart of accounts (pick suggested_account_number from this list):\n${kontoplanText}` : ''}`,
         messages: [
-          {
-            role: 'system',
-            content: `You are a receipt/invoice data extraction expert. Extract structured data accurately. Use Danish kroner (DKK) as default currency if unclear. Dates in YYYY-MM-DD format. Return your best estimate of confidence (0-1).${kontoplanText ? `\n\nChart of accounts (pick suggested_account_number from this list):\n${kontoplanText}` : ''}`,
-          },
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Extract the receipt/invoice details from this document.' },
-              { type: 'image_url', image_url: { url: dataUrl } },
+              fileBlock,
+              { type: 'text', text: 'Classify this document and extract the receipt/invoice details if applicable.' },
             ],
           },
         ],
-        tools: [TOOL_SCHEMA],
-        tool_choice: { type: 'function', function: { name: 'extract_receipt' } },
+        tools: [TOOL],
+        tool_choice: { type: 'tool', name: 'extract_receipt' },
       }),
     })
 
     if (!aiRes.ok) {
       const errText = await aiRes.text()
-      console.error('AI gateway error:', aiRes.status, errText)
+      console.error('Anthropic API error:', aiRes.status, errText)
       await supabase.from('documents').update({ ocr_status: 'failed' }).eq('id', document_id)
-      if (aiRes.status === 429) {
+      if (aiRes.status === 429 || aiRes.status === 529) {
         return new Response(JSON.stringify({ error: 'Rate limit. Prøv igen senere.' }), {
           status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: 'AI-credits opbrugt. Tilføj kredit i workspace settings.' }), {
-          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
       throw new Error(`AI error ${aiRes.status}: ${errText}`)
     }
 
     const aiData = await aiRes.json()
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0]
-    if (!toolCall) {
+    const toolUse = aiData.content?.find((b: any) => b.type === 'tool_use')
+    if (!toolUse) {
       await supabase.from('documents').update({ ocr_status: 'failed' }).eq('id', document_id)
       throw new Error('No tool call in AI response')
     }
 
-    const extracted = JSON.parse(toolCall.function.arguments)
+    const extracted = toolUse.input
+    const isReceipt = extracted.document_type === 'receipt' || extracted.document_type === 'invoice'
+
+    if (!isReceipt) {
+      // Ikke bogføringsmateriale — afvis så det ikke fylder i Indbakken (ses stadig under Bilag)
+      await supabase.from('documents').update({
+        status: 'rejected',
+        ocr_status: 'done',
+        ocr_data: extracted,
+        ocr_confidence: extracted.confidence,
+      }).eq('id', document_id)
+
+      return new Response(JSON.stringify({ success: true, classified_as: extracted.document_type, rejected: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     await supabase.from('documents').update({
       vendor: extracted.vendor || doc.vendor,
