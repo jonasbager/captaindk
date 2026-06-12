@@ -12,177 +12,8 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
-      accounts: {
-        Row: {
-          company_id: string
-          created_at: string
-          energy_levy: string | null
-          id: string
-          kind: string
-          name: string
-          number: number
-          tax_line: string | null
-          updated_at: string
-          vat_code: string
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          energy_levy?: string | null
-          id?: string
-          kind: string
-          name: string
-          number: number
-          tax_line?: string | null
-          updated_at?: string
-          vat_code?: string
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          energy_levy?: string | null
-          id?: string
-          kind?: string
-          name?: string
-          number?: number
-          tax_line?: string | null
-          updated_at?: string
-          vat_code?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "accounts_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bank_auth_states: {
-        Row: {
-          aspsp_name: string
-          company_id: string
-          created_at: string
-          state: string
-          user_id: string
-        }
-        Insert: {
-          aspsp_name: string
-          company_id: string
-          created_at?: string
-          state?: string
-          user_id: string
-        }
-        Update: {
-          aspsp_name?: string
-          company_id?: string
-          created_at?: string
-          state?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bank_auth_states_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bank_connections: {
-        Row: {
-          account_name: string | null
-          account_uid: string
-          aspsp_country: string
-          aspsp_name: string | null
-          company_id: string
-          created_at: string
-          currency: string
-          iban: string | null
-          id: string
-          last_synced_at: string | null
-          provider: string
-          session_id: string
-          status: string
-          updated_at: string
-          user_id: string
-          valid_until: string | null
-        }
-        Insert: {
-          account_name?: string | null
-          account_uid: string
-          aspsp_country?: string
-          aspsp_name?: string | null
-          company_id: string
-          created_at?: string
-          currency?: string
-          iban?: string | null
-          id?: string
-          last_synced_at?: string | null
-          provider?: string
-          session_id: string
-          status?: string
-          updated_at?: string
-          user_id: string
-          valid_until?: string | null
-        }
-        Update: {
-          account_name?: string | null
-          account_uid?: string
-          aspsp_country?: string
-          aspsp_name?: string | null
-          company_id?: string
-          created_at?: string
-          currency?: string
-          iban?: string | null
-          id?: string
-          last_synced_at?: string | null
-          provider?: string
-          session_id?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
-          valid_until?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bank_connections_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       chat_messages: {
         Row: {
           attachments: Json | null
@@ -221,7 +52,6 @@ export type Database = {
       }
       companies: {
         Row: {
-          company_type: string
           created_at: string
           cvr: string | null
           fiscal_year_start: string
@@ -229,10 +59,8 @@ export type Database = {
           name: string
           owner_id: string
           updated_at: string
-          vat_period: string
         }
         Insert: {
-          company_type?: string
           created_at?: string
           cvr?: string | null
           fiscal_year_start?: string
@@ -240,10 +68,8 @@ export type Database = {
           name: string
           owner_id: string
           updated_at?: string
-          vat_period?: string
         }
         Update: {
-          company_type?: string
           created_at?: string
           cvr?: string | null
           fiscal_year_start?: string
@@ -251,7 +77,6 @@ export type Database = {
           name?: string
           owner_id?: string
           updated_at?: string
-          vat_period?: string
         }
         Relationships: []
       }
@@ -484,7 +309,6 @@ export type Database = {
       journal_entries: {
         Row: {
           account: string
-          account_id: string | null
           account_number: number | null
           amount: number
           company_id: string
@@ -493,15 +317,11 @@ export type Database = {
           description: string
           has_document: boolean
           id: string
-          net_amount: number | null
           status: string
           updated_at: string
-          vat_amount: number
-          vat_code: string
         }
         Insert: {
           account: string
-          account_id?: string | null
           account_number?: number | null
           amount: number
           company_id: string
@@ -510,15 +330,11 @@ export type Database = {
           description: string
           has_document?: boolean
           id?: string
-          net_amount?: number | null
           status?: string
           updated_at?: string
-          vat_amount?: number
-          vat_code?: string
         }
         Update: {
           account?: string
-          account_id?: string | null
           account_number?: number | null
           amount?: number
           company_id?: string
@@ -527,20 +343,10 @@ export type Database = {
           description?: string
           has_document?: boolean
           id?: string
-          net_amount?: number | null
           status?: string
           updated_at?: string
-          vat_amount?: number
-          vat_code?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "journal_entries_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "journal_entries_company_id_fkey"
             columns: ["company_id"]
@@ -580,60 +386,38 @@ export type Database = {
       transactions: {
         Row: {
           amount: number
-          bank_connection_id: string | null
           company_id: string
-          counterparty: string | null
           created_at: string
-          currency: string
           date: string
           description: string
-          external_id: string | null
           id: string
           matched_document_id: string | null
           source: string
-          status: string
           updated_at: string
         }
         Insert: {
           amount: number
-          bank_connection_id?: string | null
           company_id: string
-          counterparty?: string | null
           created_at?: string
-          currency?: string
           date: string
           description: string
-          external_id?: string | null
           id?: string
           matched_document_id?: string | null
           source?: string
-          status?: string
           updated_at?: string
         }
         Update: {
           amount?: number
-          bank_connection_id?: string | null
           company_id?: string
-          counterparty?: string | null
           created_at?: string
-          currency?: string
           date?: string
           description?: string
-          external_id?: string | null
           id?: string
           matched_document_id?: string | null
           source?: string
-          status?: string
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "transactions_bank_connection_id_fkey"
-            columns: ["bank_connection_id"]
-            isOneToOne: false
-            referencedRelation: "bank_connections"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "transactions_company_id_fkey"
             columns: ["company_id"]
@@ -706,10 +490,6 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
-      }
-      seed_default_kontoplan: {
-        Args: { p_company_id: string }
-        Returns: undefined
       }
     }
     Enums: {
@@ -839,9 +619,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: ["admin", "user"],
