@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, FileWarning, CreditCard, Sparkles, Inbox } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -6,6 +7,8 @@ import { formatAmountShort, formatAmount } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
+import { useEngineEntries } from "@/hooks/useEngineEntries";
+import { computeResultat, computeBalance } from "@/lib/skat/engine";
 
 const fadeIn = (delay: number) => ({
   initial: { opacity: 0, y: 8 },
@@ -32,8 +35,25 @@ interface JournalEntry {
 
 export default function Dashboard() {
   const { company } = useCompany();
+  const { entries: engineEntries } = useEngineEntries();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [counts, setCounts] = useState({ documents: 0, transactions: 0, suggestions: 0 });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const yearStart = `${new Date().getFullYear()}-01-01`;
+
+  const resultat = useMemo(
+    () => computeResultat(engineEntries, yearStart, today),
+    [engineEntries, yearStart, today]
+  );
+  const balance = useMemo(
+    () => computeBalance(engineEntries, today),
+    [engineEntries, today]
+  );
+  const banksaldo = useMemo(
+    () => engineEntries.filter((e) => e.account_number === 5000).reduce((s, e) => s + e.net_amount, 0),
+    [engineEntries]
+  );
 
   useEffect(() => {
     if (!company) return;
@@ -73,6 +93,13 @@ export default function Dashboard() {
 
   const fiscalYear = new Date(company.fiscal_year_start).getFullYear();
 
+  const kpis = [
+    { label: "Omsætning YTD", value: resultat.nettoomsaetning },
+    { label: "Resultat YTD", value: resultat.resultat },
+    { label: "Skyldig moms", value: balance.skyldig_moms },
+    { label: "Banksaldo", value: banksaldo },
+  ];
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <motion.div {...fadeIn(0)}>
@@ -83,19 +110,14 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* KPI Cards — empty state */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Omsætning YTD", value: 0 },
-          { label: "Resultat YTD", value: 0 },
-          { label: "Skyldig moms", value: 0 },
-          { label: "Banksaldo", value: 0 },
-        ].map((kpi, i) => (
+        {kpis.map((kpi, i) => (
           <motion.div key={kpi.label} {...fadeIn(0.05 * (i + 1))}
             className="border border-border/50 rounded bg-card p-4"
           >
             <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
-            <p className="text-xl font-mono font-semibold text-muted-foreground">
+            <p className={`text-xl font-mono font-semibold ${kpi.value !== 0 ? (kpi.value >= 0 ? "" : "text-destructive") : "text-muted-foreground"}`}>
               {formatAmountShort(kpi.value)}
             </p>
           </motion.div>

@@ -85,13 +85,27 @@ export default function Indbakke() {
     }
   };
 
-  const handleDrop = useCallback((_txId: string) => {
+  const handleDrop = useCallback(async (txId: string) => {
+    const docId = draggedDocId;
     setDraggedDocId(null);
     setDragOverTxId(null);
-  }, []);
+    if (!docId) return;
+
+    const { error } = await supabase
+      .from("transactions")
+      .update({ matched_document_id: docId })
+      .eq("id", txId);
+
+    if (error) {
+      toast({ title: "Fejl ved match", description: error.message, variant: "destructive" });
+    } else {
+      await supabase.from("documents").update({ status: "matched" }).eq("id", docId);
+      toast({ title: "Matchet", description: "Bilag koblet til transaktion" });
+      refresh();
+    }
+  }, [draggedDocId, toast, refresh]);
 
   const total = documents.length + transactions.length;
-  const processed = 0;
   const suggestions: any[] = [];
 
   return (
@@ -99,9 +113,9 @@ export default function Indbakke() {
       <div className="px-6 pt-4 pb-2 border-b border-border/30">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-sm font-semibold">Indbakke</h1>
-          <span className="text-xs font-mono text-muted-foreground">{processed} af {total} behandlet</span>
+          <span className="text-xs font-mono text-muted-foreground">{total} elementer venter</span>
         </div>
-        <Progress value={total > 0 ? (processed / total) * 100 : 0} className="h-1" />
+        <Progress value={total === 0 ? 100 : 0} className="h-1" />
       </div>
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30 overflow-hidden">

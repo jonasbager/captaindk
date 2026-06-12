@@ -1,17 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, FileText, Check, Trash2 } from "lucide-react";
+import { Search, Filter, FileText, Check, Trash2, Loader2 } from "lucide-react";
 import { formatAmount } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/hooks/useCompany";
+import { useToast } from "@/hooks/use-toast";
 
-const allEntries: any[] = [];
-
-const totalCount = 0;
-const pendingCount = 0;
+interface JournalEntry {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  account: string;
+  account_number: number | null;
+  status: string;
+  has_document: boolean;
+}
 
 const statusColors: Record<string, string> = {
   godkendt: "bg-primary/15 text-primary border-primary/20",
@@ -20,12 +29,29 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Posteringer() {
+  const { company } = useCompany();
+  const { toast } = useToast();
+  const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("alle");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    if (!company) return;
+    const { data } = await supabase
+      .from("journal_entries")
+      .select("id, date, description, amount, account, account_number, status, has_document")
+      .eq("company_id", company.id)
+      .order("date", { ascending: false });
+    if (data) setAllEntries(data as JournalEntry[]);
+    setLoading(false);
+  }, [company]);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = allEntries.filter((e) => {
     if (statusFilter !== "alle" && e.status !== statusFilter) return false;
@@ -51,7 +77,43 @@ export default function Posteringer() {
     }
   };
 
+  const approveSelected = async () => {
+    const ids = [...checkedIds];
+    const { error } = await supabase.from("journal_entries").update({ status: "godkendt" }).in("id", ids);
+    if (error) {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Godkendt", description: `${ids.length} postering${ids.length !== 1 ? "er" : ""} godkendt` });
+      setCheckedIds(new Set());
+      load();
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (!confirm(`Slet ${checkedIds.size} postering${checkedIds.size !== 1 ? "er" : ""}?`)) return;
+    const ids = [...checkedIds];
+    const { error } = await supabase.from("journal_entries").delete().in("id", ids);
+    if (error) {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Slettet", description: `${ids.length} postering${ids.length !== 1 ? "er" : ""} slettet` });
+      setCheckedIds(new Set());
+      if (selected && ids.includes(selected)) setSelected(null);
+      load();
+    }
+  };
+
+  const totalCount = allEntries.length;
+  const pendingCount = allEntries.filter((e) => e.status !== "godkendt").length;
   const selectedEntry = allEntries.find((e) => e.id === selected);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-2.75rem)]">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-2.75rem)]">
@@ -67,10 +129,10 @@ export default function Posteringer() {
             {checkedIds.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{checkedIds.size} valgt</span>
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={approveSelected}>
                   <Check className="h-3 w-3" /> Godkend
                 </Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-destructive">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-destructive" onClick={deleteSelected}>
                   <Trash2 className="h-3 w-3" /> Slet
                 </Button>
               </div>
@@ -104,55 +166,63 @@ export default function Posteringer() {
         </div>
 
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-card z-10">
-              <tr className="border-b border-border/30 text-xs text-muted-foreground">
-                <th className="p-3 w-8">
-                  <Checkbox checked={checkedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
-                </th>
-                <th className="text-left p-3 font-medium">Dato</th>
-                <th className="text-left p-3 font-medium">Beskrivelse</th>
-                <th className="text-left p-3 font-medium">Konto</th>
-                <th className="text-right p-3 font-medium">Beløb</th>
-                <th className="text-center p-3 font-medium">Status</th>
-                <th className="text-center p-3 font-medium">Bilag</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((entry, i) => (
-                <motion.tr
-                  key={entry.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.02 }}
-                  onClick={() => setSelected(entry.id)}
-                  className={`border-b border-border/20 cursor-pointer transition-colors ${
-                    selected === entry.id ? "bg-accent/40" : "hover:bg-accent/20"
-                  }`}
-                >
-                  <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox checked={checkedIds.has(entry.id)} onCheckedChange={() => toggleCheck(entry.id)} />
-                  </td>
-                  <td className="p-3 font-mono text-xs text-muted-foreground">{entry.date}</td>
-                  <td className="p-3">{entry.description}</td>
-                  <td className="p-3 text-xs text-muted-foreground">
-                    <span className="font-mono">{entry.accountNumber}</span> {entry.account}
-                  </td>
-                  <td className={`p-3 text-right font-mono text-sm ${entry.amount >= 0 ? "text-primary" : ""}`}>
-                    {formatAmount(entry.amount)}
-                  </td>
-                  <td className="p-3 text-center">
-                    <Badge variant="outline" className={`text-[10px] ${statusColors[entry.status]}`}>
-                      {entry.status}
-                    </Badge>
-                  </td>
-                  <td className="p-3 text-center">
-                    <span className={`inline-block w-2 h-2 rounded-full ${entry.hasDocument ? "bg-primary" : "bg-destructive"}`} />
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+          {allEntries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <FileText className="h-8 w-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm text-muted-foreground">Ingen posteringer endnu</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Brug bogførings-chatten til at oprette din første postering</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-card z-10">
+                <tr className="border-b border-border/30 text-xs text-muted-foreground">
+                  <th className="p-3 w-8">
+                    <Checkbox checked={checkedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
+                  </th>
+                  <th className="text-left p-3 font-medium">Dato</th>
+                  <th className="text-left p-3 font-medium">Beskrivelse</th>
+                  <th className="text-left p-3 font-medium">Konto</th>
+                  <th className="text-right p-3 font-medium">Beløb</th>
+                  <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-center p-3 font-medium">Bilag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((entry, i) => (
+                  <motion.tr
+                    key={entry.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.02 }}
+                    onClick={() => setSelected(entry.id === selected ? null : entry.id)}
+                    className={`border-b border-border/20 cursor-pointer transition-colors ${
+                      selected === entry.id ? "bg-accent/40" : "hover:bg-accent/20"
+                    }`}
+                  >
+                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox checked={checkedIds.has(entry.id)} onCheckedChange={() => toggleCheck(entry.id)} />
+                    </td>
+                    <td className="p-3 font-mono text-xs text-muted-foreground">{entry.date}</td>
+                    <td className="p-3">{entry.description}</td>
+                    <td className="p-3 text-xs text-muted-foreground">
+                      <span className="font-mono">{entry.account_number}</span> {entry.account}
+                    </td>
+                    <td className={`p-3 text-right font-mono text-sm ${entry.amount >= 0 ? "text-primary" : ""}`}>
+                      {formatAmount(entry.amount)}
+                    </td>
+                    <td className="p-3 text-center">
+                      <Badge variant="outline" className={`text-[10px] ${statusColors[entry.status] || ""}`}>
+                        {entry.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className={`inline-block w-2 h-2 rounded-full ${entry.has_document ? "bg-primary" : "bg-destructive"}`} />
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -166,15 +236,15 @@ export default function Posteringer() {
           <div className="space-y-3 text-sm">
             <DetailRow label="Dato" value={selectedEntry.date} mono />
             <DetailRow label="Beskrivelse" value={selectedEntry.description} />
-            <DetailRow label="Konto" value={`${selectedEntry.accountNumber} — ${selectedEntry.account}`} />
+            <DetailRow label="Konto" value={`${selectedEntry.account_number ?? "—"} — ${selectedEntry.account}`} />
             <DetailRow label="Beløb" value={formatAmount(selectedEntry.amount)} mono />
             <DetailRow label="Status" value={selectedEntry.status} />
-            <DetailRow label="Bilag" value={selectedEntry.hasDocument ? "Tilknyttet" : "Mangler"} />
+            <DetailRow label="Bilag" value={selectedEntry.has_document ? "Tilknyttet" : "Mangler"} />
           </div>
-          {selectedEntry.hasDocument && (
+          {selectedEntry.has_document && (
             <div className="border border-border/40 rounded p-3 flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">bilag_{selectedEntry.id}.pdf</span>
+              <span className="text-xs text-muted-foreground">bilag_{selectedEntry.id.slice(0, 8)}.pdf</span>
             </div>
           )}
         </motion.div>
