@@ -29,7 +29,14 @@ interface CvrCompany {
   startdate: string;
 }
 
-type Step = "welcome" | "cvr_input" | "cvr_confirm" | "manual_name" | "manual_cvr_optional" | "fiscal_year" | "creating" | "done";
+type Step = "welcome" | "cvr_input" | "cvr_confirm" | "manual_name" | "manual_cvr_optional" | "company_type" | "vat_period" | "fiscal_year" | "creating" | "done";
+
+// Matcher CVR-registerets virksomhedsformtekst til vores company_type
+const detectCompanyType = (companydesc: string): "enkeltmandsvirksomhed" | "aps" | null => {
+  if (/anpartsselskab/i.test(companydesc)) return "aps";
+  if (/enkeltmandsvirksomhed/i.test(companydesc)) return "enkeltmandsvirksomhed";
+  return null;
+};
 
 export default function Onboarding() {
   const { user } = useAuth();
@@ -42,6 +49,8 @@ export default function Onboarding() {
   const [cvrData, setCvrData] = useState<CvrCompany | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [companyCvr, setCompanyCvr] = useState("");
+  const [companyType, setCompanyType] = useState<"enkeltmandsvirksomhed" | "aps">("enkeltmandsvirksomhed");
+  const [vatPeriod, setVatPeriod] = useState<"maanedlig" | "kvartalsvis" | "halvaarlig">("halvaarlig");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const addMessage = (msg: Omit<ChatMessage, "id">) => {
@@ -118,6 +127,59 @@ export default function Onboarding() {
     }
   };
 
+  const askCompanyType = () => {
+    addMessage({
+      role: "captain",
+      content: "Hvilken virksomhedsform har du?",
+      options: [
+        { label: "Enkeltmandsvirksomhed", value: "type_enkelt" },
+        { label: "ApS", value: "type_aps" },
+      ],
+    });
+    setStep("company_type");
+  };
+
+  const askVatPeriod = () => {
+    addMessage({
+      role: "captain",
+      content: "Hvor ofte afregner du moms? Det står i din registrering hos Skattestyrelsen — nye og mindre virksomheder er typisk halvårlige.",
+      options: [
+        { label: "Halvårligt", value: "vat_halvaarlig" },
+        { label: "Kvartalsvis", value: "vat_kvartalsvis" },
+        { label: "Månedligt", value: "vat_maanedlig" },
+      ],
+    });
+    setStep("vat_period");
+  };
+
+  const askFiscalYear = () => {
+    addMessage({
+      role: "captain",
+      content: "Hvornår starter dit regnskabsår?",
+      options: [
+        { label: "1. januar", value: "fiscal_jan" },
+        { label: "1. juli", value: "fiscal_jul" },
+        { label: "Andet", value: "fiscal_custom" },
+      ],
+    });
+    setStep("fiscal_year");
+  };
+
+  // Efter CVR-bekræftelse: spring virksomhedsform-spørgsmålet over hvis CVR-registeret allerede har svaret
+  const afterCompanyConfirmed = () => {
+    const detected = cvrData ? detectCompanyType(cvrData.companydesc) : null;
+    if (detected) {
+      setCompanyType(detected);
+      addMessage({
+        role: "captain",
+        content: `Jeg kan se i CVR-registeret, at det er en **${detected === "aps" ? "ApS" : "enkeltmandsvirksomhed"}** — det noterer jeg.`,
+      });
+      askVatPeriod();
+    } else {
+      askCompanyType();
+    }
+  };
+
   const createCompany = async (name: string, cvr: string | null, fiscalStart: string) => {
     if (!user) return;
     setStep("creating");
@@ -127,6 +189,8 @@ export default function Onboarding() {
       name,
       cvr: cvr || null,
       fiscal_year_start: fiscalStart,
+      company_type: companyType,
+      vat_period: vatPeriod,
       owner_id: user.id,
     });
 
@@ -159,16 +223,32 @@ export default function Onboarding() {
         break;
       case "confirm_cvr":
         addMessage({ role: "user", content: "Ja, det er korrekt!" });
-        addMessage({
-          role: "captain",
-          content: "Hvornår starter dit regnskabsår?",
-          options: [
-            { label: "1. januar", value: "fiscal_jan" },
-            { label: "1. juli", value: "fiscal_jul" },
-            { label: "Andet", value: "fiscal_custom" },
-          ],
-        });
-        setStep("fiscal_year");
+        afterCompanyConfirmed();
+        break;
+      case "type_enkelt":
+        addMessage({ role: "user", content: "Enkeltmandsvirksomhed" });
+        setCompanyType("enkeltmandsvirksomhed");
+        askVatPeriod();
+        break;
+      case "type_aps":
+        addMessage({ role: "user", content: "ApS" });
+        setCompanyType("aps");
+        askVatPeriod();
+        break;
+      case "vat_halvaarlig":
+        addMessage({ role: "user", content: "Halvårligt" });
+        setVatPeriod("halvaarlig");
+        askFiscalYear();
+        break;
+      case "vat_kvartalsvis":
+        addMessage({ role: "user", content: "Kvartalsvis" });
+        setVatPeriod("kvartalsvis");
+        askFiscalYear();
+        break;
+      case "vat_maanedlig":
+        addMessage({ role: "user", content: "Månedligt" });
+        setVatPeriod("maanedlig");
+        askFiscalYear();
         break;
       case "wrong_cvr":
         addMessage({ role: "user", content: "Nej, det er forkert" });
@@ -233,16 +313,7 @@ export default function Onboarding() {
       } else {
         addMessage({ role: "user", content: text });
       }
-      addMessage({
-        role: "captain",
-        content: "Hvornår starter dit regnskabsår?",
-        options: [
-          { label: "1. januar", value: "fiscal_jan" },
-          { label: "1. juli", value: "fiscal_jul" },
-          { label: "Andet", value: "fiscal_custom" },
-        ],
-      });
-      setStep("fiscal_year");
+      askCompanyType();
     } else if (step === "fiscal_year") {
       // Try parse a date
       addMessage({ role: "user", content: text });
@@ -259,22 +330,13 @@ export default function Onboarding() {
   const handleOptionClickExtended = (value: string) => {
     if (value === "skip_cvr") {
       addMessage({ role: "user", content: "Spring CVR over" });
-      addMessage({
-        role: "captain",
-        content: "Hvornår starter dit regnskabsår?",
-        options: [
-          { label: "1. januar", value: "fiscal_jan" },
-          { label: "1. juli", value: "fiscal_jul" },
-          { label: "Andet", value: "fiscal_custom" },
-        ],
-      });
-      setStep("fiscal_year");
+      askCompanyType();
     } else {
       handleOptionClick(value);
     }
   };
 
-  const isInputDisabled = step === "creating" || step === "done" || step === "welcome" || step === "cvr_confirm";
+  const isInputDisabled = step === "creating" || step === "done" || step === "welcome" || step === "cvr_confirm" || step === "company_type" || step === "vat_period";
   const showInput = step !== "creating" && step !== "done";
 
   return (

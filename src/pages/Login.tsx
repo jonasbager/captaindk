@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,17 +29,19 @@ export default function Login() {
     );
   }
 
-  const handleOAuth = async (provider: "google" | "apple") => {
+  const handleOAuth = async (provider: "google" | "azure") => {
     setSigningIn(true);
     setError(null);
-    try {
-      const result = await lovable.auth.signInWithOAuth(provider);
-      if (result.error) {
-        setError("Der opstod en fejl. Prøv igen.");
-      }
-    } catch {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin,
+        ...(provider === "azure" ? { scopes: "email" } : {}),
+      },
+    });
+    // Ved succes navigerer browseren væk — kun fejl når hertil
+    if (error) {
       setError("Der opstod en fejl. Prøv igen.");
-    } finally {
       setSigningIn(false);
     }
   };
@@ -110,6 +111,20 @@ export default function Login() {
                 {signingIn ? "Logger ind..." : "Log ind med Google"}
               </Button>
 
+              <Button
+                variant="outline"
+                className="w-full h-12 gap-3 text-sm"
+                onClick={() => handleOAuth("azure")}
+                disabled={signingIn}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 23 23">
+                  <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+                  <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
+                  <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
+                  <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
+                </svg>
+                {signingIn ? "Logger ind..." : "Log ind med Microsoft"}
+              </Button>
 
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
