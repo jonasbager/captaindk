@@ -4,13 +4,14 @@ import { MessageCircle, X, Send, Loader2, Anchor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { SUPABASE_URL } from "@/integrations/supabase/client";
 
 interface Msg {
   role: "user" | "assistant";
   content: string;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/captain-chat`;
+const CHAT_URL = `${SUPABASE_URL}/functions/v1/captain-chat`;
 
 export function CaptainChat() {
   const { toast } = useToast();

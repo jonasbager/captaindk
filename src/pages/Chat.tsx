@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
 import { MessageCard, type StructuredCardData } from "@/components/MessageCard";
 import { formatAmount } from "@/lib/format";
 
@@ -17,7 +17,7 @@ interface Msg {
   structured_data?: StructuredCardData | null;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/captain-chat`;
+const CHAT_URL = `${SUPABASE_URL}/functions/v1/captain-chat`;
 
 export default function Chat() {
   const { toast } = useToast();
