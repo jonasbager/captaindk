@@ -180,6 +180,7 @@ async function runTool(name: string, input: any, ctx: {
           kind: 'posting', date: input.date, description: input.description,
           amount: gross, account: `${account.number} ${account.name}`,
           counter_account: 'Bank', vat_rate: rate > 0 ? 25 : 0,
+          entry_id: entry.id,
         },
       }
     }

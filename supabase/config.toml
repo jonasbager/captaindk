@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.extract-receipt]
 verify_jwt = false
 
+[functions.captain-nudge]
+verify_jwt = false
+
 [functions.auto-match]
 verify_jwt = false
 

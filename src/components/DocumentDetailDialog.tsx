@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
@@ -56,6 +57,17 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [booking, setBooking] = useState(false);
+  // Valutaomregning: kurs = DKK pr. 1 enhed fremmed valuta
+  const [fxRate, setFxRate] = useState<number | null>(null);
+  const [fxRateDate, setFxRateDate] = useState<string | null>(null);
+  const [fxLoading, setFxLoading] = useState(false);
+  const [fxError, setFxError] = useState(false);
+  const [manualRate, setManualRate] = useState("");
+
+  const isForeign = !!doc?.currency && doc.currency !== "DKK";
+  const effectiveRate = isForeign
+    ? (manualRate.trim() ? Number(manualRate.replace(",", ".")) : fxRate)
+    : 1;
 
   useEffect(() => {
     if (!open || !company) return;
@@ -106,6 +118,31 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
     })();
   }, [open, documentId, toast]);
 
+  // Hent dagskurs når et bilag i fremmed valuta er indlæst
+  useEffect(() => {
+    setFxRate(null);
+    setFxRateDate(null);
+    setFxError(false);
+    setManualRate("");
+    if (!doc || !doc.currency || doc.currency === "DKK") return;
+    const lookupDate = doc.date || new Date().toISOString().slice(0, 10);
+    setFxLoading(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("fx-rate", {
+          body: { currency: doc.currency, date: lookupDate },
+        });
+        if (error || !data?.rate) throw new Error(error?.message || "Ingen kurs");
+        setFxRate(Number(data.rate));
+        setFxRateDate(data.date || lookupDate);
+      } catch {
+        setFxError(true);
+      } finally {
+        setFxLoading(false);
+      }
+    })();
+  }, [doc]);
+
   const handleDelete = async () => {
     if (!doc) return;
     if (!confirm("Vil du slette dette bilag? Filen og data fjernes permanent.")) return;
@@ -133,18 +170,30 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
       toast({ title: "Vælg konto", description: "Vælg hvilken konto bilaget skal bogføres på", variant: "destructive" });
       return;
     }
+    // Bilag i fremmed valuta skal omregnes til DKK før bogføring
+    if (isForeign && (!effectiveRate || !isFinite(effectiveRate) || effectiveRate <= 0)) {
+      toast({ title: "Mangler valutakurs", description: "Indtast kursen manuelt for at bogføre dette bilag.", variant: "destructive" });
+      return;
+    }
     setBooking(true);
     try {
       const rate = VAT_IN_GROSS[account.vat_code] ?? 0;
-      const gross = Number(doc.amount);
-      const net = rate > 0 ? Math.round((gross / (1 + rate)) * 100) / 100 : gross;
-      const vat = Math.round((gross - net) * 100) / 100;
+      const grossOriginal = Number(doc.amount);
+      const grossDkk = isForeign
+        ? Math.round(grossOriginal * (effectiveRate as number) * 100) / 100
+        : grossOriginal;
+      const net = rate > 0 ? Math.round((grossDkk / (1 + rate)) * 100) / 100 : grossDkk;
+      const vat = Math.round((grossDkk - net) * 100) / 100;
+
+      const fxNote = isForeign
+        ? ` (${formatAmount(grossOriginal, doc.currency)} @ ${(effectiveRate as number).toFixed(4)}${fxRateDate ? ` ${fxRateDate}` : ""})`
+        : "";
 
       const { error: entryError } = await supabase.from("journal_entries").insert({
         company_id: company.id,
         date: doc.date || new Date().toISOString().slice(0, 10),
-        description: doc.vendor || doc.subject || "Bilag",
-        amount: gross,
+        description: (doc.vendor || doc.subject || "Bilag") + fxNote,
+        amount: grossDkk,
         net_amount: net,
         vat_amount: vat,
         vat_code: account.vat_code,
@@ -156,6 +205,7 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
       });
       if (entryError) throw entryError;
 
+      // documents-rækken beholder original valuta + beløb som revisionsspor
       const { error: docError } = await supabase.from("documents").update({ status: "booked" }).eq("id", doc.id);
       if (docError) throw docError;
 
@@ -320,20 +370,59 @@ export function DocumentDetailDialog({ documentId, open, onOpenChange, onDeleted
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button size="sm" className="text-xs gap-1.5" onClick={handleBook} disabled={booking || !selectedAccountId}>
+                    <Button
+                      size="sm"
+                      className="text-xs gap-1.5"
+                      onClick={handleBook}
+                      disabled={booking || !selectedAccountId || fxLoading || (isForeign && !(effectiveRate && effectiveRate > 0))}
+                    >
                       {booking ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookCheck className="h-3 w-3" />}
                       Bogfør
                     </Button>
                   </div>
+
+                  {/* Valutaomregning */}
+                  {isForeign && (
+                    <div className="space-y-1.5">
+                      {fxLoading ? (
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" /> Henter dagskurs…
+                        </p>
+                      ) : (effectiveRate && effectiveRate > 0) ? (
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          {formatAmount(Number(doc.amount), doc.currency)} = {formatAmount(Math.round(Number(doc.amount) * effectiveRate * 100) / 100)}
+                          {" "}(kurs {effectiveRate.toFixed(4)}{fxRateDate ? ` pr. ${fxRateDate}` : ""}{manualRate.trim() ? ", manuel" : ""})
+                        </p>
+                      ) : null}
+                      {(fxError || manualRate.trim()) && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">
+                            {fxError ? "Kunne ikke hente kurs — indtast manuelt:" : "Manuel kurs:"}
+                          </span>
+                          <Input
+                            value={manualRate}
+                            onChange={(e) => setManualRate(e.target.value)}
+                            placeholder="fx 7,45"
+                            inputMode="decimal"
+                            className="h-7 w-24 text-xs font-mono"
+                          />
+                          <span className="text-[10px] text-muted-foreground">DKK / {doc.currency}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {selectedAccountId && (() => {
                     const acc = accounts.find((a) => a.id === selectedAccountId);
                     if (!acc) return null;
                     const rate = VAT_IN_GROSS[acc.vat_code] ?? 0;
-                    const gross = Number(doc.amount);
-                    const net = rate > 0 ? Math.round((gross / (1 + rate)) * 100) / 100 : gross;
+                    const grossDkk = isForeign && effectiveRate
+                      ? Math.round(Number(doc.amount) * effectiveRate * 100) / 100
+                      : Number(doc.amount);
+                    const net = rate > 0 ? Math.round((grossDkk / (1 + rate)) * 100) / 100 : grossDkk;
                     return (
                       <p className="text-[10px] text-muted-foreground font-mono">
-                        Netto {formatAmount(net)} · moms {formatAmount(gross - net)} ({acc.vat_code})
+                        DKK: netto {formatAmount(net)} · moms {formatAmount(Math.round((grossDkk - net) * 100) / 100)} ({acc.vat_code})
                       </p>
                     );
                   })()}

@@ -188,11 +188,36 @@ export default function Faktura() {
         pdf_url = path;
       }
 
-      // Journal entries on send
+      // Journal entries on send — salgsmoms skal med i computeMoms, så
+      // omsætningslinjen bogføres på en rigtig omsætningskonto (account_id) med
+      // vat_code='U25', net=ekskl. moms og vat=momsbeløbet.
       if (status === "sendt") {
+        const { data: accs } = await supabase
+          .from("accounts")
+          .select("id, number, name")
+          .eq("company_id", company.id)
+          .in("number", [1020, 1010, 1000, 5100]);
+        const byNumber = new Map((accs || []).map((a) => [a.number, a]));
+        const rev = byNumber.get(1020) || byNumber.get(1010) || byNumber.get(1000) || null;
+        const debtor = byNumber.get(5100) || null;
+
         const { data: je } = await supabase.from("journal_entries").insert([
-          { company_id: company.id, date: invoiceDate, description: `Faktura #${inv.number} — ${customer.name}`, account: "Nettoomsætning", account_number: 1000, amount: -subtotal, status: "godkendt", has_document: true },
-          { company_id: company.id, date: invoiceDate, description: `Faktura #${inv.number} — ${customer.name}`, account: "Tilgodehavender", account_number: 5100, amount: total, status: "godkendt", has_document: true },
+          {
+            company_id: company.id, date: invoiceDate,
+            description: `Faktura #${inv.number} — ${customer.name}`,
+            account: rev?.name ?? "Nettoomsætning", account_number: rev?.number ?? 1000,
+            account_id: rev?.id ?? null,
+            amount: -subtotal, net_amount: subtotal, vat_amount: totalVat, vat_code: "U25",
+            status: "godkendt", has_document: true,
+          },
+          {
+            company_id: company.id, date: invoiceDate,
+            description: `Faktura #${inv.number} — ${customer.name}`,
+            account: debtor?.name ?? "Tilgodehavender", account_number: debtor?.number ?? 5100,
+            account_id: debtor?.id ?? null,
+            amount: total, net_amount: total, vat_amount: 0, vat_code: "NONE",
+            status: "godkendt", has_document: true,
+          },
         ]).select();
         journal_entry_id = je?.[0]?.id ?? null;
       }
@@ -213,9 +238,16 @@ export default function Faktura() {
     setBusy(true);
     try {
       const today = new Date().toISOString().split("T")[0];
+      // Betaling = ren balancebevægelse (bank ← debitor), ingen moms.
+      const { data: accs } = await supabase
+        .from("accounts").select("id, number, name")
+        .eq("company_id", company.id).in("number", [5000, 5100]);
+      const byNumber = new Map((accs || []).map((a) => [a.number, a]));
+      const bank = byNumber.get(5000) || null;
+      const debtor = byNumber.get(5100) || null;
       const { data: je } = await supabase.from("journal_entries").insert([
-        { company_id: company.id, date: today, description: `Betaling faktura #${inv.number} — ${inv.customer}`, account: "Bankkonto", account_number: 5000, amount: inv.total, status: "godkendt", has_document: true },
-        { company_id: company.id, date: today, description: `Betaling faktura #${inv.number} — ${inv.customer}`, account: "Tilgodehavender", account_number: 5100, amount: -inv.total, status: "godkendt", has_document: true },
+        { company_id: company.id, date: today, description: `Betaling faktura #${inv.number} — ${inv.customer}`, account: bank?.name ?? "Bankkonto", account_number: bank?.number ?? 5000, account_id: bank?.id ?? null, amount: inv.total, net_amount: inv.total, vat_amount: 0, vat_code: "NONE", status: "godkendt", has_document: true },
+        { company_id: company.id, date: today, description: `Betaling faktura #${inv.number} — ${inv.customer}`, account: debtor?.name ?? "Tilgodehavender", account_number: debtor?.number ?? 5100, account_id: debtor?.id ?? null, amount: -inv.total, net_amount: -inv.total, vat_amount: 0, vat_code: "NONE", status: "godkendt", has_document: true },
       ]).select();
       await supabase.from("invoices").update({
         status: "betalt", paid_at: new Date().toISOString(), payment_journal_entry_id: je?.[0]?.id ?? null,

@@ -27,7 +27,18 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [counts, setCounts] = useState({ docs: 0, tx: 0 });
+  const [undoneIds, setUndoneIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleUndo = async (entryId: string) => {
+    const { error } = await supabase.from("journal_entries").delete().eq("id", entryId);
+    if (error) {
+      toast({ title: "Kunne ikke fortryde", description: error.message, variant: "destructive" });
+      return;
+    }
+    setUndoneIds((prev) => new Set(prev).add(entryId));
+    toast({ title: "Fortrudt", description: "Bogføringen er slettet." });
+  };
 
   // Load history + context counts
   useEffect(() => {
@@ -150,7 +161,17 @@ export default function Chat() {
                         {m.content || (loading && i === messages.length - 1 ? <Loader2 className="h-3 w-3 animate-spin inline" /> : null)}
                       </div>
                     )}
-                    {m.structured_data && <MessageCard data={m.structured_data} />}
+                    {m.structured_data && (
+                      <MessageCard
+                        data={m.structured_data}
+                        onUndo={handleUndo}
+                        undone={
+                          m.structured_data.kind === "posting" && m.structured_data.entry_id
+                            ? undoneIds.has(m.structured_data.entry_id)
+                            : false
+                        }
+                      />
+                    )}
                   </div>
                 </motion.div>
               ))}

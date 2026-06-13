@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatAmount } from "@/lib/format";
-import { Check, X, FileText, Receipt, Percent, Building2, AlertCircle } from "lucide-react";
+import { Check, X, FileText, Receipt, Percent, Building2, AlertCircle, Undo2 } from "lucide-react";
 
 interface BaseProps {
   onApprove?: () => void;
   onReject?: () => void;
+  onUndo?: (entryId: string) => void;
+  undone?: boolean;
 }
 
 export interface PostingCardData {
@@ -16,6 +18,7 @@ export interface PostingCardData {
   account: string;
   counter_account: string;
   vat_rate?: number;
+  entry_id?: string;
 }
 
 export interface InvoiceCardData {
@@ -43,16 +46,16 @@ export interface AlertCardData {
 
 export type StructuredCardData = PostingCardData | InvoiceCardData | VatCardData | AlertCardData;
 
-export function MessageCard({ data, onApprove, onReject }: { data: StructuredCardData } & BaseProps) {
+export function MessageCard({ data, onApprove, onReject, onUndo, undone }: { data: StructuredCardData } & BaseProps) {
   if (data.kind === "posting") {
     return (
       <div className="border border-border/60 rounded bg-card/60 p-3 space-y-2 text-sm">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Receipt className="h-3 w-3" />
-          <span>Konteringsforslag</span>
+          <span>{undone ? "Bogføring fortrudt" : "Bogført"}</span>
           <span className="font-mono ml-auto">{data.date}</span>
         </div>
-        <p className="font-medium">{data.description}</p>
+        <p className={`font-medium ${undone ? "line-through text-muted-foreground" : ""}`}>{data.description}</p>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div><span className="text-muted-foreground">Konto:</span> <span className="font-mono">{data.account}</span></div>
           <div><span className="text-muted-foreground">Modkonto:</span> <span className="font-mono">{data.counter_account}</span></div>
@@ -65,6 +68,13 @@ export function MessageCard({ data, onApprove, onReject }: { data: StructuredCar
           <div className="flex gap-2 pt-1">
             {onApprove && <Button size="sm" className="h-7 text-xs gap-1" onClick={onApprove}><Check className="h-3 w-3" /> Godkend</Button>}
             {onReject && <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={onReject}><X className="h-3 w-3" /> Ret</Button>}
+          </div>
+        )}
+        {onUndo && data.entry_id && !undone && (
+          <div className="pt-1">
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground hover:text-destructive" onClick={() => onUndo(data.entry_id!)}>
+              <Undo2 className="h-3 w-3" /> Fortryd
+            </Button>
           </div>
         )}
       </div>
