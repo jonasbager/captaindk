@@ -23,17 +23,17 @@ const STEPS = [
 ];
 
 const customerCols: ColumnSpec[] = [
-  { key: "name", label: "Navn", required: true, matcher: /navn|name|kontakt|kunde|company/i },
+  { key: "name", label: "Navn", required: true, matcher: /navn|name|kunde|client|company/i },
   { key: "cvr", label: "CVR", matcher: /cvr|vat|se-?nr/i },
   { key: "email", label: "Email", matcher: /mail|email/i },
   { key: "address", label: "Adresse", matcher: /adresse|address|gade|street/i },
-  { key: "terms", label: "Betalingsfrist (dage)", matcher: /betaling|terms|frist|dage/i },
+  { key: "terms", label: "Betalingsfrist (dage)", matcher: /betalingsfrist|frist|dage|terms/i },
 ];
 const productCols: ColumnSpec[] = [
-  { key: "name", label: "Navn", required: true, matcher: /navn|name|produkt|vare|ydelse|titel/i },
-  { key: "description", label: "Beskrivelse", matcher: /beskriv|description|tekst|note/i },
-  { key: "price", label: "Pris (ekskl. moms)", matcher: /pris|price|beløb|amount|stk/i },
-  { key: "vat", label: "Momssats", matcher: /moms|vat/i },
+  { key: "name", label: "Navn", required: true, matcher: /produktnavn|varenavn|navn|name|titel|ydelse/i },
+  { key: "description", label: "Beskrivelse", matcher: /kommentar|beskriv|description|tekst|note/i },
+  { key: "price", label: "Pris (ekskl. moms)", matcher: /pris|price|beløb|amount/i },
+  { key: "vat", label: "Momssats", matcher: /momssats|momsprocent|moms%|vat.?rate|vatsats/i },
   { key: "unit", label: "Enhed", matcher: /enhed|unit/i },
 ];
 const invoiceCols: ColumnSpec[] = [
@@ -44,10 +44,39 @@ const invoiceCols: ColumnSpec[] = [
   { key: "total", label: "Beløb (inkl. moms)", matcher: /beløb|total|amount|sum|inkl/i },
 ];
 const balanceCols: ColumnSpec[] = [
-  { key: "account", label: "Kontonr./navn", required: true, matcher: /konto|account|nr|number|navn|name/i },
-  { key: "name", label: "Kontonavn", matcher: /navn|name|tekst|beskriv/i },
+  { key: "account", label: "Kontonr.", required: true, matcher: /^konto$|kontonr|kontonummer|account|^nr$|number/i },
+  { key: "name", label: "Kontonavn", matcher: /kontonavn|navn|name|tekst|beskriv/i },
   { key: "balance", label: "Saldo", required: true, matcher: /saldo|balance|beløb|amount|primo|ultimo/i },
 ];
+
+// Foreslå Captain-konto fra en Dinero/Billy-saldobalancelinje. Dineros kontonumre
+// (5-cifrede) matcher sjældent Captains 4-cifrede kontoplan, så vi matcher på
+// kontonavnet for de almindelige balance-/drifts-konti og falder tilbage på
+// eksakt nummermatch.
+function suggestCaptainAccount(sourceNum: number, sourceName: string, accounts: AccountRow[]): string | undefined {
+  const byNum = (n: number) => accounts.find((a) => a.number === n)?.id;
+  const exact = accounts.find((a) => a.number === sourceNum);
+  const n = sourceName.toLowerCase();
+  // Rækkefølge betyder noget: specifikke momskonti før det brede "salg/ydelser",
+  // så "Salg af varer/ydelser m/moms" og "...uden moms" ikke fejlagtigt rammer moms.
+  const kw: [RegExp, number][] = [
+    [/debitor/, 5100],
+    [/kreditor/, 6100],
+    [/bank|pleo|sparekasse|lsb|likvid|kasse/, 5000],
+    [/egenkapital/, 6000],
+    [/salgsmoms|købsmoms|momsafregning|moms.?afregn|udgående moms|indgående moms/, 6200],
+    [/eu-leverancer|eu-salg|rubrik b/, 1030],
+    [/salg|omsætning|ydelser/, 1000],
+    [/regnskabsprogram|software|abonnement/, 3630],
+    [/transport|rejse|kørsel/, 3680],
+    [/udlæg/, 5200],
+  ];
+  // Navne-match vinder for balance-/momskonti (mere præcist end et tilfældigt nummersammenfald)
+  for (const [re, num] of kw) {
+    if (re.test(n)) { const id = byNum(num); if (id) return id; }
+  }
+  return exact?.id;
+}
 
 export default function Migrer() {
   const { company } = useCompany();
@@ -195,12 +224,12 @@ export default function Migrer() {
     const parsed = rows
       .map((r) => ({ account: (r.account || "").trim(), name: (r.name || r.account || "").trim(), balance: parseLocalizedAmount(r.balance || "0") }))
       .filter((r) => r.account && r.balance !== 0);
-    // Auto-foreslå Captain-konto: match på kontonummer i kilde-strengen
+    // Auto-foreslå Captain-konto via navn (og nummer som fallback)
     const map: Record<number, string> = {};
     parsed.forEach((r, i) => {
       const num = parseInt(r.account.replace(/\D/g, ""), 10);
-      const hit = accounts.find((a) => a.number === num);
-      if (hit) map[i] = hit.id;
+      const id = suggestCaptainAccount(num, r.name, accounts);
+      if (id) map[i] = id;
     });
     setBalanceRows(parsed);
     setAccountMap(map);
@@ -338,7 +367,11 @@ export default function Migrer() {
             </div>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">Eksportér din saldobalance (kontonr. + saldo) som CSV.</p>
+              <p className="text-xs text-muted-foreground">
+                Skifter du ved årets start? Upload din <strong>åbningsbalance</strong> (kun balancekonti: bank,
+                debitorer, kreditorer, egenkapital, moms). Skifter du midt i året, og skal Captain vise hele året?
+                Upload din fulde <strong>saldobalance</strong>. Format: kontonr. + kontonavn + saldo.
+              </p>
               <CsvMapper columns={balanceCols} onMapped={receiveBalanceRows} cta="Næste: map konti" />
             </>
           )
