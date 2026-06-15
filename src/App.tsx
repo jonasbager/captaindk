@@ -21,6 +21,7 @@ import Moms from "@/pages/Moms";
 import Skat from "@/pages/Skat";
 import Bilag from "@/pages/Bilag";
 import Import from "@/pages/Import";
+import Migrer from "@/pages/Migrer";
 import Integrationer from "@/pages/Integrationer";
 import Indstillinger from "@/pages/Indstillinger";
 import Onboarding from "@/pages/Onboarding";
@@ -134,6 +135,7 @@ const App = () => (
             <Route path="/skat" element={<ProtectedAppPage><Skat /></ProtectedAppPage>} />
             <Route path="/bilag" element={<ProtectedAppPage><Bilag /></ProtectedAppPage>} />
             <Route path="/import" element={<ProtectedAppPage><Import /></ProtectedAppPage>} />
+            <Route path="/migrer" element={<ProtectedAppPage><Migrer /></ProtectedAppPage>} />
             <Route path="/integrationer" element={<ProtectedAppPage><Integrationer /></ProtectedAppPage>} />
             <Route path="/indstillinger" element={<ProtectedAppPage><Indstillinger /></ProtectedAppPage>} />
             <Route path="/snap" element={<ProtectedAppPage><Snap /></ProtectedAppPage>} />

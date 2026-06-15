@@ -454,11 +454,17 @@ export default function Onboarding() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex justify-center mt-4"
+            className="flex flex-col items-center gap-3 mt-4"
           >
             <Button onClick={() => navigate("/dashboard", { replace: true })} className="gap-2">
               Gå til dashboard <ArrowRight className="w-4 h-4" />
             </Button>
+            <button
+              onClick={() => navigate("/migrer", { replace: true })}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Kommer du fra Dinero eller Billy? Flyt dit regnskab →
+            </button>
           </motion.div>
         )}
 

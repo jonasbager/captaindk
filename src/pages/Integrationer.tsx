@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, CreditCard, Plug, Building2, Receipt, Loader2, RefreshCw, Upload } from "lucide-react";
+import { Mail, CreditCard, Plug, Building2, Receipt, Loader2, RefreshCw, Upload, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,6 +40,7 @@ const baseIntegrations: Integration[] = [
   { id: "bank", name: "Bank (PSD2)", description: "Automatisk import af banktransaktioner via Enable Banking", icon: CreditCard, status: "ikke-forbundet" },
   { id: "csv", name: "Kontoudtog (CSV)", description: "Importér banktransaktioner fra en CSV-fil — alternativ til bankforbindelse, med AI-konteringsforslag", icon: Upload, status: "ikke-forbundet" },
   { id: "pleo", name: "Pleo", description: "CSV-import nu, API-integration i v2", icon: Receipt, status: "ikke-forbundet" },
+  { id: "migrer", name: "Flyt dit regnskab", description: "Kommer du fra Dinero eller Billy? Hent kunder, produkter, åbne fakturaer og saldobalance ind via CSV", icon: ArrowRightLeft, status: "ikke-forbundet" },
   { id: "booksmate", name: "Booksmate", description: "Del dit regnskab direkte med din revisor", icon: Plug, status: "kommer-snart" },
   { id: "skat", name: "SKAT TastSelv", description: "Automatisk indberetning af oplysningsskema til SKAT", icon: Building2, status: "kommer-snart" },
 ];
@@ -321,9 +322,14 @@ export default function Integrationer() {
                   <Upload className="h-3 w-3" /> Importér CSV
                 </Button>
               )}
+              {int.id === "migrer" && (
+                <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => navigate("/migrer")}>
+                  <ArrowRightLeft className="h-3 w-3" /> Start migrering
+                </Button>
+              )}
 
               {/* Other integrations */}
-              {!["gmail", "outlook", "bank", "csv"].includes(int.id) && int.status === "ikke-forbundet" && (
+              {!["gmail", "outlook", "bank", "csv", "migrer"].includes(int.id) && int.status === "ikke-forbundet" && (
                 <Button size="sm" variant="outline" className="text-xs">Forbind</Button>
               )}
               {int.status === "kommer-snart" && (

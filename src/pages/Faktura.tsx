@@ -58,6 +58,7 @@ export default function Faktura() {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; unit_price: number; vat_rate: number }[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showCustomer, setShowCustomer] = useState(false);
   const [openInvoice, setOpenInvoice] = useState<InvoiceRow | null>(null);
@@ -106,17 +107,24 @@ export default function Faktura() {
 
   const refetch = useCallback(async () => {
     if (!company) return;
-    const [inv, cust] = await Promise.all([
+    const [inv, cust, prod] = await Promise.all([
       supabase.from("invoices").select("*").eq("company_id", company.id).order("date", { ascending: false }),
       supabase.from("customers").select("*").eq("company_id", company.id).order("name"),
+      supabase.from("products").select("id, name, unit_price, vat_rate").eq("company_id", company.id).order("name"),
     ]);
     if (inv.data) setInvoices(inv.data as any);
     if (cust.data) setCustomers(cust.data as any);
+    if (prod.data) setProducts(prod.data as any);
   }, [company]);
 
   useEffect(() => { refetch(); }, [refetch]);
 
   const addLine = () => setLines((p) => [...p, { id: Date.now(), description: "", quantity: 1, price: 0, vatRate: 25 }]);
+  const addProductLine = (productId: string) => {
+    const p = products.find((x) => x.id === productId);
+    if (!p) return;
+    setLines((prev) => [...prev, { id: Date.now(), description: p.name, quantity: 1, price: Number(p.unit_price), vatRate: p.vat_rate ?? 25 }]);
+  };
   const removeLine = (id: number) => lines.length > 1 && setLines((p) => p.filter((l) => l.id !== id));
   const updateLine = (id: number, f: keyof InvoiceLine, v: string | number) =>
     setLines((p) => p.map((l) => l.id === id ? { ...l, [f]: v } : l));
@@ -338,9 +346,23 @@ export default function Faktura() {
                     </Button>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" className="text-xs gap-1" onClick={addLine}>
-                  <Plus className="h-3 w-3" /> Tilføj linje
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="text-xs gap-1" onClick={addLine}>
+                    <Plus className="h-3 w-3" /> Tilføj linje
+                  </Button>
+                  {products.length > 0 && (
+                    <Select value="" onValueChange={addProductLine}>
+                      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="+ Tilføj produkt" /></SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">
+                            {p.name} · {formatAmount(Number(p.unit_price))}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
               </div>
 
               <div className="border-t border-border/30 pt-4 space-y-1 text-sm">

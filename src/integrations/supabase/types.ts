@@ -407,6 +407,30 @@ export type Database = {
         }
         Relationships: []
       }
+      fx_rates: {
+        Row: {
+          created_at: string
+          currency: string
+          date: string
+          rate: number
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          date: string
+          rate: number
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          date?: string
+          rate?: number
+          source?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           company_id: string
@@ -543,6 +567,50 @@ export type Database = {
           },
           {
             foreignKeyName: "journal_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          unit: string | null
+          unit_price: number
+          updated_at: string
+          vat_rate: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string
+          vat_rate?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
