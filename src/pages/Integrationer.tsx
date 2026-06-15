@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, CreditCard, Plug, Building2, Receipt, Loader2, RefreshCw } from "lucide-react";
+import { Mail, CreditCard, Plug, Building2, Receipt, Loader2, RefreshCw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -37,6 +38,7 @@ const baseIntegrations: Integration[] = [
   { id: "gmail", name: "Gmail", description: "Automatisk scanning af kvitteringer i din Gmail-indbakke", icon: Mail, status: "ikke-forbundet", provider: "gmail" },
   { id: "outlook", name: "Microsoft 365 / Outlook", description: "Find kvitteringer og fakturaer i Outlook automatisk", icon: Mail, status: "ikke-forbundet", provider: "outlook" },
   { id: "bank", name: "Bank (PSD2)", description: "Automatisk import af banktransaktioner via Enable Banking", icon: CreditCard, status: "ikke-forbundet" },
+  { id: "csv", name: "Kontoudtog (CSV)", description: "Importér banktransaktioner fra en CSV-fil — alternativ til bankforbindelse, med AI-konteringsforslag", icon: Upload, status: "ikke-forbundet" },
   { id: "pleo", name: "Pleo", description: "CSV-import nu, API-integration i v2", icon: Receipt, status: "ikke-forbundet" },
   { id: "booksmate", name: "Booksmate", description: "Del dit regnskab direkte med din revisor", icon: Plug, status: "kommer-snart" },
   { id: "skat", name: "SKAT TastSelv", description: "Automatisk indberetning af oplysningsskema til SKAT", icon: Building2, status: "kommer-snart" },
@@ -53,6 +55,7 @@ export default function Integrationer() {
   const { toast } = useToast();
   const { session } = useAuth();
   const { company } = useCompany();
+  const navigate = useNavigate();
   const [integrations, setIntegrations] = useState<Integration[]>(baseIntegrations);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [scanning, setScanning] = useState<string | null>(null);
@@ -313,8 +316,14 @@ export default function Integrationer() {
                 </div>
               )}
 
+              {int.id === "csv" && (
+                <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => navigate("/import")}>
+                  <Upload className="h-3 w-3" /> Importér CSV
+                </Button>
+              )}
+
               {/* Other integrations */}
-              {!["gmail", "outlook", "bank"].includes(int.id) && int.status === "ikke-forbundet" && (
+              {!["gmail", "outlook", "bank", "csv"].includes(int.id) && int.status === "ikke-forbundet" && (
                 <Button size="sm" variant="outline" className="text-xs">Forbind</Button>
               )}
               {int.status === "kommer-snart" && (

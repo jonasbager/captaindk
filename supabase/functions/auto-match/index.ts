@@ -18,9 +18,28 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
     const { document_id, company_id } = await req.json()
-    if (!document_id || !company_id) {
-      return new Response(JSON.stringify({ error: 'document_id and company_id required' }), {
+    if (!company_id) {
+      return new Response(JSON.stringify({ error: 'company_id required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Batch-tilstand: ingen document_id → match alle bilag uden tilknyttet transaktion
+    // (bruges efter CSV-import af kontoudtog). Genbruger samme matchregel pr. bilag.
+    if (!document_id) {
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('id, amount, date')
+        .eq('company_id', company_id)
+        .not('amount', 'is', null)
+        .not('date', 'is', null)
+      let matched = 0
+      for (const d of docs || []) {
+        const r = await matchOne(supabase, company_id, d)
+        if (r) matched++
+      }
+      return new Response(JSON.stringify({ matched }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -76,3 +95,38 @@ Deno.serve(async (req) => {
     })
   }
 })
+
+// Match ét bilag mod præcis én ledig transaktion (±3 dage, eksakt beløb).
+// Springer over hvis bilaget allerede er matchet. Returnerer true ved match.
+async function matchOne(
+  supabase: any,
+  company_id: string,
+  doc: { id: string; amount: number | null; date: string | null },
+): Promise<boolean> {
+  if (!doc.amount || !doc.date) return false
+
+  const { data: already } = await supabase
+    .from('transactions').select('id').eq('matched_document_id', doc.id).limit(1)
+  if (already && already.length > 0) return false
+
+  const docAmt = Math.abs(Number(doc.amount))
+  const docDate = new Date(doc.date)
+  const minDate = new Date(docDate); minDate.setDate(minDate.getDate() - 3)
+  const maxDate = new Date(docDate); maxDate.setDate(maxDate.getDate() + 3)
+
+  const { data: candidates } = await supabase
+    .from('transactions')
+    .select('id, amount')
+    .eq('company_id', company_id)
+    .is('matched_document_id', null)
+    .gte('date', minDate.toISOString().split('T')[0])
+    .lte('date', maxDate.toISOString().split('T')[0])
+
+  const exact = (candidates || []).filter((t: any) => Math.abs(Math.abs(Number(t.amount)) - docAmt) < 0.01)
+  if (exact.length === 1) {
+    await supabase.from('transactions')
+      .update({ matched_document_id: doc.id }).eq('id', exact[0].id)
+    return true
+  }
+  return false
+}

@@ -9,6 +9,7 @@ import { formatAmount } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useToast } from "@/hooks/use-toast";
+import { parseCsv, parseLocalizedAmount, parseDate } from "@/lib/csv";
 
 type ParsedCsvFile = {
   fileName: string;
@@ -35,50 +36,6 @@ const sourceOptions = [
   { value: "andet", label: "Andet" },
 ];
 
-const splitCsvLine = (line: string, delimiter: string) => {
-  const values: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    const next = line[i + 1];
-
-    if (char === '"') {
-      if (inQuotes && next === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (char === delimiter && !inQuotes) {
-      values.push(current.trim());
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  values.push(current.trim());
-  return values.map((value) => value.replace(/^"|"$/g, "").trim());
-};
-
-const detectDelimiter = (lines: string[]) => {
-  const candidates = [";", ",", "\t"];
-  const sample = lines.slice(0, 5);
-
-  return candidates
-    .map((delimiter) => ({
-      delimiter,
-      score: sample.reduce((sum, line) => sum + splitCsvLine(line, delimiter).length, 0),
-    }))
-    .sort((a, b) => b.score - a.score)[0]?.delimiter || ",";
-};
-
 const inferSource = (fileName: string) => {
   const name = fileName.toLowerCase();
   if (name.includes("lunar")) return "lunar";
@@ -102,17 +59,7 @@ const inferColumnMapping = (header: string, index: number) => {
   return index < 5 ? ["Dato", "Beskrivelse", "Beløb", "Valuta", "Reference"][index] ?? "Ignorer" : "Ignorer";
 };
 
-const parseLocalizedAmount = (value: string) => {
-  const normalized = value.replace(/\s/g, "").replace(/\.(?=.*[,])/g, "").replace(/,/g, ".");
-  const amount = Number(normalized.replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(amount) ? amount : 0;
-};
-
-// Kontoforslag kommer fra rigtig AI/regel-motor — ikke implementeret endnu.
-const noSuggestion = {
-  account: "Ikke foreslået endnu",
-  reason: "Tilkobl AI-motor for at få automatisk kontoforslag.",
-};
+type Suggestion = { account_number: number; account: string; reason: string };
 
 export default function Import() {
   const navigate = useNavigate();
@@ -126,6 +73,8 @@ export default function Import() {
   const [file, setFile] = useState<ParsedCsvFile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [suggestions, setSuggestions] = useState<Map<number, Suggestion>>(new Map());
+  const [suggestLoading, setSuggestLoading] = useState(false);
 
   useEffect(() => {
     const preventFileDrop = (event: DragEvent) => {
@@ -153,17 +102,18 @@ export default function Import() {
 
     return file.rows.map((row, index) => {
       const description = getValue(row, "Beskrivelse") || `Transaktion ${index + 1}`;
+      const sug = suggestions.get(index);
 
       return {
         id: index + 1,
         date: getValue(row, "Dato") || "—",
         description,
         amount: parseLocalizedAmount(getValue(row, "Beløb")),
-        suggestedAccount: noSuggestion.account,
-        aiReason: noSuggestion.reason,
+        suggestedAccount: sug?.account ?? (suggestLoading ? "Foreslår…" : "Ikke foreslået"),
+        aiReason: sug?.reason ?? "",
       };
     });
-  }, [file, mapping]);
+  }, [file, mapping, suggestions, suggestLoading]);
 
   const autoApprovedCount = 0;
 
@@ -179,16 +129,36 @@ export default function Import() {
     setApproved(new Set(reviewItems.map((item) => item.id)));
   };
 
-  const parseDate = (raw: string): string | null => {
-    if (!raw) return null;
-    const trimmed = raw.trim();
-    const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-    const dmy = trimmed.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})/);
-    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
-    const parsed = new Date(trimmed);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
-    return null;
+  // Kald suggest-accounts for at få AI-konteringsforslag pr. række.
+  const fetchSuggestions = async () => {
+    if (!company || !file) return;
+    setSuggestLoading(true);
+    try {
+      const getValue = (row: string[], label: string) => {
+        const idx = mapping.findIndex((m) => m === label);
+        return idx >= 0 ? row[idx] ?? "" : "";
+      };
+      const rows = file.rows.map((row) => ({
+        description: getValue(row, "Beskrivelse"),
+        amount: parseLocalizedAmount(getValue(row, "Beløb")),
+      }));
+
+      const [{ data }, { data: accs }] = await Promise.all([
+        supabase.functions.invoke("suggest-accounts", { body: { company_id: company.id, rows } }),
+        supabase.from("accounts").select("number, name").eq("company_id", company.id),
+      ]);
+      const nameByNumber = new Map((accs || []).map((a: any) => [a.number, a.name]));
+      const map = new Map<number, Suggestion>();
+      for (const s of data?.suggestions ?? []) {
+        const name = nameByNumber.get(s.account_number);
+        if (name) map.set(s.index, { account_number: s.account_number, account: `${s.account_number} ${name}`, reason: s.reason || "" });
+      }
+      setSuggestions(map);
+    } catch {
+      // Forslag er valgfrie — fortsæt uden hvis AI fejler
+    } finally {
+      setSuggestLoading(false);
+    }
   };
 
   const handleImport = async () => {
@@ -218,7 +188,17 @@ export default function Import() {
       const { error: insertError } = await supabase.from("transactions").insert(rows);
       if (insertError) throw insertError;
 
-      toast({ title: "Import gennemført", description: `${rows.length} transaktioner blev importeret.` });
+      // Auto-match de importerede transaktioner mod ventende bilag (samme som bank-sync)
+      let matched = 0;
+      try {
+        const { data: m } = await supabase.functions.invoke("auto-match", { body: { company_id: company.id } });
+        matched = m?.matched ?? 0;
+      } catch { /* matching er valgfri */ }
+
+      toast({
+        title: "Import gennemført",
+        description: `${rows.length} transaktioner importeret${matched > 0 ? ` · ${matched} matchet med bilag` : ""}.`,
+      });
       navigate("/indbakke");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Ukendt fejl";
@@ -235,29 +215,18 @@ export default function Import() {
     }
 
     try {
-      const raw = (await selectedFile.text()).replace(/^\uFEFF/, "");
-      const lines = raw
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      if (lines.length < 2) {
+      const text = await selectedFile.text();
+      const parsed = parseCsv(text);
+      if (!parsed) {
         setError("CSV-filen ser tom ud eller mangler data.");
         return;
       }
 
-      const delimiter = detectDelimiter(lines);
-      const parsed = lines.map((line) => splitCsvLine(line, delimiter));
-      const headers = parsed[0].map((header, index) => header || `Kolonne ${index + 1}`);
-      const rows = parsed
-        .slice(1)
-        .filter((row) => row.some((cell) => cell !== ""))
-        .map((row) => headers.map((_, index) => row[index] ?? ""));
-
-      setFile({ fileName: selectedFile.name, headers, rows });
-      setMapping(headers.map(inferColumnMapping));
+      setFile({ fileName: selectedFile.name, headers: parsed.headers, rows: parsed.rows });
+      setMapping(parsed.headers.map(inferColumnMapping));
       setSource(inferSource(selectedFile.name));
       setApproved(new Set());
+      setSuggestions(new Map());
       setError(null);
       setStep(2);
     } catch {
@@ -404,7 +373,7 @@ export default function Import() {
           </div>
 
           <div className="flex justify-end">
-            <Button size="sm" className="text-xs" onClick={() => setStep(3)}>
+            <Button size="sm" className="text-xs" onClick={() => { setStep(3); fetchSuggestions(); }}>
               Næste <ChevronRight className="h-3 w-3 ml-1" />
             </Button>
           </div>
