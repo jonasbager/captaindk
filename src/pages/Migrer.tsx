@@ -95,6 +95,8 @@ export default function Migrer() {
   // Afstemning: sum af åbne fakturaer vs. debitor-primo
   const [invoiceTotal, setInvoiceTotal] = useState<number | null>(null);
   const [debtorOpening, setDebtorOpening] = useState<number | null>(null);
+  // Guard mod dobbelt-bogføring af primo
+  const [primoWarning, setPrimoWarning] = useState<number | null>(null);
 
   useEffect(() => {
     if (!company) return;
@@ -235,8 +237,22 @@ export default function Migrer() {
     setAccountMap(map);
   };
 
-  const commitBalances = async () => {
+  const commitBalances = async (force = false) => {
     if (!company || !balanceRows) return;
+    // Guard: er der allerede bogført primo (overførsel) på skæringsdatoen?
+    if (!force) {
+      const { count } = await supabase
+        .from("journal_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", company.id)
+        .eq("date", cutover)
+        .like("description", "Primo (overført)%");
+      if (count && count > 0) {
+        setPrimoWarning(count);
+        return;
+      }
+    }
+    setPrimoWarning(null);
     setBusy(true);
     try {
       const entries = balanceRows
@@ -358,11 +374,22 @@ export default function Migrer() {
                   </div>
                 ))}
               </div>
+              {primoWarning != null && (
+                <div className="border border-warning/30 bg-warning/5 rounded p-3 text-xs text-warning space-y-2">
+                  <p>
+                    Der er allerede bogført {primoWarning} primo-postering{primoWarning === 1 ? "" : "er"} pr. {cutover}.
+                    Bogfører du igen, oprettes saldiene <strong>oveni</strong> de eksisterende (dobbelttælling).
+                  </p>
+                  <Button size="sm" variant="destructive" className="text-xs" onClick={() => commitBalances(true)}>
+                    Bogfør alligevel
+                  </Button>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-[11px] text-muted-foreground">
                   {Object.keys(accountMap).length} af {balanceRows.length} konti mappet
                 </span>
-                <Button size="sm" className="text-xs" onClick={commitBalances}>Bogfør primo-saldi</Button>
+                <Button size="sm" className="text-xs" onClick={() => commitBalances(false)}>Bogfør primo-saldi</Button>
               </div>
             </div>
           ) : (
