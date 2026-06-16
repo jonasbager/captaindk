@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Plus, Trash2, Send, Download, FileText, Inbox, CheckCircle2, Loader2, Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PAYMENT_METHODS, filledMethods } from "@/lib/payment-methods";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +75,19 @@ export default function Faktura() {
     return d.toISOString().split("T")[0];
   });
   const [dueDateTouched, setDueDateTouched] = useState(false);
+  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
+
+  // Tilgængelige metoder (udfyldt på virksomheden) + virksomhedens standardvalg
+  const availableMethods = company ? filledMethods(company) : [];
+  const companyDefaultMethods = company
+    ? (company.invoice_default_methods || []).filter((k) => availableMethods.includes(k as any))
+    : [];
+
+  // Seed fakturaens metoder fra virksomhedens standard, når create-formen åbnes
+  useEffect(() => {
+    if (showCreate) setSelectedMethods(companyDefaultMethods);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCreate, company]);
 
   // 3-niveau forfaldsfrist: kunde → virksomhed → 8 dage. Auto-udfyld forfald =
   // fakturadato + frist, indtil brugeren selv retter datoen.
@@ -151,6 +166,7 @@ export default function Faktura() {
     setCustomerId("");
     setInvoiceDate(today);
     setDueDateTouched(false);
+    setSelectedMethods(companyDefaultMethods);
     const d = new Date(); d.setDate(d.getDate() + 14);
     setDueDate(d.toISOString().split("T")[0]);
     setLines([{ id: 1, description: "", quantity: 1, price: 0, vatRate: 25 }]);
@@ -192,6 +208,7 @@ export default function Faktura() {
         total_excl_vat: subtotal,
         total_vat: totalVat,
         status,
+        payment_methods: selectedMethods,
         sent_at: status === "sendt" ? new Date().toISOString() : null,
       }).select().single();
       if (error) throw error;
@@ -215,7 +232,7 @@ export default function Faktura() {
           name: company.name, cvr: company.cvr,
           bank_reg: company.bank_reg, bank_konto: company.bank_konto,
           mobilepay: company.mobilepay, iban: company.iban, swift: company.swift,
-          logo, paymentTerms: custTerms,
+          logo, paymentTerms: custTerms, paymentMethods: selectedMethods,
         },
         customer,
         invoice: { number: inv.number, date: invoiceDate, due_date: dueDate, lines, subtotal, totalVat, total },
@@ -402,6 +419,24 @@ export default function Faktura() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Moms</span><span className="font-mono">{formatAmount(totalVat)}</span></div>
                 <div className="flex justify-between font-semibold text-base pt-1 border-t border-border/20"><span>Total</span><span className="font-mono text-primary">{formatAmount(total)}</span></div>
               </div>
+
+              {availableMethods.length > 0 && (
+                <div className="border-t border-border/30 pt-4 space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Betalingsmetoder på fakturaen</p>
+                  <div className="flex flex-wrap gap-4">
+                    {PAYMENT_METHODS.filter((m) => availableMethods.includes(m.key)).map((m) => (
+                      <label key={m.key} className="flex items-center gap-2 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={selectedMethods.includes(m.key)}
+                          onCheckedChange={(v) =>
+                            setSelectedMethods((prev) => (v ? [...new Set([...prev, m.key])] : prev.filter((k) => k !== m.key)))}
+                        />
+                        {m.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 justify-end">
                 <Button size="sm" variant="outline" className="text-xs" onClick={resetCreate} disabled={busy}>Annuller</Button>

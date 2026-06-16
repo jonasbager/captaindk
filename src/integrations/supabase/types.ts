@@ -230,6 +230,7 @@ export type Database = {
           fiscal_year_start: string
           iban: string | null
           id: string
+          invoice_default_methods: string[]
           logo_url: string | null
           mobilepay: string | null
           name: string
@@ -248,6 +249,7 @@ export type Database = {
           fiscal_year_start?: string
           iban?: string | null
           id?: string
+          invoice_default_methods?: string[]
           logo_url?: string | null
           mobilepay?: string | null
           name: string
@@ -266,6 +268,7 @@ export type Database = {
           fiscal_year_start?: string
           iban?: string | null
           id?: string
+          invoice_default_methods?: string[]
           logo_url?: string | null
           mobilepay?: string | null
           name?: string
@@ -466,6 +469,7 @@ export type Database = {
           number: number
           paid_at: string | null
           payment_journal_entry_id: string | null
+          payment_methods: string[] | null
           pdf_url: string | null
           sent_at: string | null
           status: string
@@ -487,6 +491,7 @@ export type Database = {
           number: number
           paid_at?: string | null
           payment_journal_entry_id?: string | null
+          payment_methods?: string[] | null
           pdf_url?: string | null
           sent_at?: string | null
           status?: string
@@ -508,6 +513,7 @@ export type Database = {
           number?: number
           paid_at?: string | null
           payment_journal_entry_id?: string | null
+          payment_methods?: string[] | null
           pdf_url?: string | null
           sent_at?: string | null
           status?: string

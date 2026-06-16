@@ -14,6 +14,7 @@ interface Args {
     mobilepay?: string | null; iban?: string | null; swift?: string | null;
     logo?: { bytes: Uint8Array; type: "png" | "jpg" } | null;
     paymentTerms?: number | null;
+    paymentMethods?: string[] | null; // hvilke metoder skal vises: 'bank'|'mobilepay'|'iban'
   };
   customer: { name: string; cvr: string | null; email: string | null; address: string | null };
   invoice: {
@@ -112,10 +113,12 @@ export async function generateInvoicePdf(args: Args): Promise<Uint8Array> {
 
   // Betaling
   const c = args.company;
+  // Vis kun de valgte metoder; hvis intet er valgt, vis alle udfyldte (bagudkompatibelt)
+  const show = (key: string) => !c.paymentMethods || c.paymentMethods.includes(key);
   const payLines: string[] = [];
-  if (c.bank_reg || c.bank_konto) payLines.push(`Bankoverførsel: Reg. ${c.bank_reg || "—"} Konto ${c.bank_konto || "—"}`);
-  if (c.mobilepay) payLines.push(`MobilePay: ${c.mobilepay}`);
-  if (c.iban || c.swift) payLines.push(`IBAN ${c.iban || "—"}${c.swift ? `  SWIFT/BIC ${c.swift}` : ""}`);
+  if (show("bank") && (c.bank_reg || c.bank_konto)) payLines.push(`Bankoverførsel: Reg. ${c.bank_reg || "—"} Konto ${c.bank_konto || "—"}`);
+  if (show("mobilepay") && c.mobilepay) payLines.push(`MobilePay: ${c.mobilepay}`);
+  if (show("iban") && (c.iban || c.swift)) payLines.push(`IBAN ${c.iban || "—"}${c.swift ? `  SWIFT/BIC ${c.swift}` : ""}`);
   if (c.paymentTerms != null) payLines.push(`Betalingsbetingelser: netto ${c.paymentTerms} dage`);
 
   if (payLines.length > 0) {

@@ -19,6 +19,7 @@ export interface Company {
   iban: string | null;
   swift: string | null;
   default_payment_terms: number;
+  invoice_default_methods: string[];
 }
 
 export function useCompany() {

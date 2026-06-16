@@ -15,6 +15,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Compass, Loader2, ImagePlus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PAYMENT_METHODS, methodIsFilled } from "@/lib/payment-methods";
 
 const PREFS_KEY = "captain-prefs";
 
@@ -45,6 +47,7 @@ export default function Indstillinger() {
   const [iban, setIban] = useState("");
   const [swift, setSwift] = useState("");
   const [defaultTerms, setDefaultTerms] = useState("8");
+  const [defaultMethods, setDefaultMethods] = useState<string[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoBusy, setLogoBusy] = useState(false);
@@ -69,6 +72,7 @@ export default function Indstillinger() {
       setIban(company.iban || "");
       setSwift(company.swift || "");
       setDefaultTerms(String(company.default_payment_terms ?? 8));
+      setDefaultMethods(company.invoice_default_methods || []);
       setLogoUrl(company.logo_url);
     }
   }, [company]);
@@ -110,6 +114,8 @@ export default function Indstillinger() {
         iban: iban.trim() || null,
         swift: swift.trim() || null,
         default_payment_terms: Math.max(0, parseInt(defaultTerms, 10) || 8),
+        invoice_default_methods: defaultMethods.filter((k) =>
+          methodIsFilled(k as any, { bank_reg: bankReg, bank_konto: bankKonto, mobilepay, iban, swift })),
       })
       .eq("id", company.id);
     setSaving(false);
@@ -279,6 +285,28 @@ export default function Indstillinger() {
               <Input value={swift} onChange={(e) => setSwift(e.target.value)} className="h-8 text-sm bg-background font-mono" />
             </div>
           </div>
+
+          {/* Vis som standard på fakturaer */}
+          {(() => {
+            const fields = { bank_reg: bankReg, bank_konto: bankKonto, mobilepay, iban, swift };
+            const available = PAYMENT_METHODS.filter((m) => methodIsFilled(m.key, fields));
+            if (available.length === 0) return null;
+            const toggle = (key: string, on: boolean) =>
+              setDefaultMethods((prev) => (on ? [...new Set([...prev, key])] : prev.filter((k) => k !== key)));
+            return (
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Vis som standard på fakturaer</p>
+                <div className="flex flex-wrap gap-4">
+                  {available.map((m) => (
+                    <label key={m.key} className="flex items-center gap-2 text-xs cursor-pointer">
+                      <Checkbox checked={defaultMethods.includes(m.key)} onCheckedChange={(v) => toggle(m.key, !!v)} />
+                      {m.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <Button size="sm" className="text-xs gap-2" onClick={save} disabled={saving || !company}>
