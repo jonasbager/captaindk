@@ -42,6 +42,7 @@ export async function generateInvoicePdf(args: Args): Promise<Uint8Array> {
 
   // Logo (øverst til venstre) — ikke-fatal hvis embed fejler
   let headerX = 50;
+  let logoDrawn = false;
   if (args.company.logo) {
     try {
       const img = args.company.logo.type === "png"
@@ -53,13 +54,15 @@ export async function generateInvoicePdf(args: Args): Promise<Uint8Array> {
       const h = img.height * scale;
       page.drawImage(img, { x: 50, y: y - h + 12, width: w, height: h });
       headerX = 50 + w + 12;
-    } catch { /* uden logo */ }
+      logoDrawn = true;
+    } catch { /* falder tilbage til navn som titel */ }
   }
 
-  // Header
-  page.drawText(args.company.name, { x: headerX, y, size: 16, font: bold, color: black });
+  // Header — uden logo vises virksomhedsnavnet stort som "placeholder-logo"
+  const nameSize = logoDrawn ? 15 : 22;
+  page.drawText(args.company.name, { x: headerX, y: y - (logoDrawn ? 0 : 4), size: nameSize, font: bold, color: black });
   if (args.company.cvr) {
-    page.drawText(`CVR ${args.company.cvr}`, { x: headerX, y: y - 16, size: 9, font, color: muted });
+    page.drawText(`CVR ${args.company.cvr}`, { x: headerX, y: y - (logoDrawn ? 16 : 24), size: 9, font, color: muted });
   }
   page.drawText(`Faktura #${args.invoice.number}`, { x: 400, y, size: 14, font: bold, color: black });
   page.drawText(`Dato: ${args.invoice.date}`, { x: 400, y: y - 18, size: 9, font, color: muted });
