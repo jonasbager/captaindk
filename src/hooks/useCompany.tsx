@@ -12,6 +12,13 @@ export interface Company {
   owner_id: string;
   created_at: string;
   updated_at: string;
+  logo_url: string | null;
+  bank_reg: string | null;
+  bank_konto: string | null;
+  mobilepay: string | null;
+  iban: string | null;
+  swift: string | null;
+  default_payment_terms: number;
 }
 
 export function useCompany() {

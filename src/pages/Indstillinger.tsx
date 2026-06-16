@@ -14,7 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Compass, Loader2 } from "lucide-react";
+import { Compass, Loader2, ImagePlus } from "lucide-react";
 
 const PREFS_KEY = "captain-prefs";
 
@@ -39,6 +39,15 @@ export default function Indstillinger() {
   const [vatPeriod, setVatPeriod] = useState("halvaarlig");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bankReg, setBankReg] = useState("");
+  const [bankKonto, setBankKonto] = useState("");
+  const [mobilepay, setMobilepay] = useState("");
+  const [iban, setIban] = useState("");
+  const [swift, setSwift] = useState("");
+  const [defaultTerms, setDefaultTerms] = useState("8");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
 
   const prefs = loadPrefs();
   const [navVisible, setNavVisible] = useState(prefs.navVisible ?? true);
@@ -54,8 +63,22 @@ export default function Indstillinger() {
       setFiscalStart(company.fiscal_year_start);
       setCompanyType(company.company_type);
       setVatPeriod(company.vat_period);
+      setBankReg(company.bank_reg || "");
+      setBankKonto(company.bank_konto || "");
+      setMobilepay(company.mobilepay || "");
+      setIban(company.iban || "");
+      setSwift(company.swift || "");
+      setDefaultTerms(String(company.default_payment_terms ?? 8));
+      setLogoUrl(company.logo_url);
     }
   }, [company]);
+
+  // Hent signed URL til logo-preview
+  useEffect(() => {
+    if (!logoUrl) { setLogoPreview(null); return; }
+    supabase.storage.from("branding").createSignedUrl(logoUrl, 3600)
+      .then(({ data }) => setLogoPreview(data?.signedUrl ?? null));
+  }, [logoUrl]);
 
   useEffect(() => {
     localStorage.setItem(PREFS_KEY, JSON.stringify({ navVisible, autoSuggest, aiNotifications, emailSuggestions, emailDeadlines }));
@@ -81,6 +104,12 @@ export default function Indstillinger() {
         fiscal_year_start: fiscalStart,
         company_type: companyType,
         vat_period: vatPeriod,
+        bank_reg: bankReg.trim() || null,
+        bank_konto: bankKonto.trim() || null,
+        mobilepay: mobilepay.trim() || null,
+        iban: iban.trim() || null,
+        swift: swift.trim() || null,
+        default_payment_terms: Math.max(0, parseInt(defaultTerms, 10) || 8),
       })
       .eq("id", company.id);
     setSaving(false);
@@ -90,6 +119,50 @@ export default function Indstillinger() {
       toast({ title: "Gemt", description: "Virksomhedsoplysningerne er opdateret." });
       refetch();
     }
+  };
+
+  const uploadLogo = async (file: File) => {
+    if (!company) return;
+    if (!/\.(png|jpe?g)$/i.test(file.name)) {
+      toast({ title: "Forkert filtype", description: "Brug PNG eller JPG.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 1_000_000) {
+      toast({ title: "Filen er for stor", description: "Maks 1 MB.", variant: "destructive" });
+      return;
+    }
+    setLogoBusy(true);
+    const ext = file.name.toLowerCase().endsWith(".png") ? "png" : "jpg";
+    const path = `${company.id}/logo.${ext}`;
+    const { error: upErr } = await supabase.storage.from("branding").upload(path, file, { contentType: file.type, upsert: true });
+    if (upErr) {
+      setLogoBusy(false);
+      toast({ title: "Upload fejlede", description: upErr.message, variant: "destructive" });
+      return;
+    }
+    await supabase.from("companies").update({ logo_url: path }).eq("id", company.id);
+    setLogoUrl(path);
+    setLogoBusy(false);
+    toast({ title: "Logo opdateret" });
+    refetch();
+  };
+
+  const removeLogo = async () => {
+    if (!company || !logoUrl) return;
+    setLogoBusy(true);
+    await supabase.storage.from("branding").remove([logoUrl]);
+    await supabase.from("companies").update({ logo_url: null }).eq("id", company.id);
+    setLogoUrl(null);
+    setLogoBusy(false);
+    refetch();
+  };
+
+  const pickLogo = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg";
+    input.onchange = () => { const f = input.files?.[0]; if (f) uploadLogo(f); };
+    input.click();
   };
 
   const deleteCompany = async () => {
@@ -154,6 +227,60 @@ export default function Indstillinger() {
             </Select>
           </div>
         </div>
+
+        {/* Logo */}
+        <div className="space-y-1.5 pt-2 border-t border-border/30">
+          <Label className="text-xs">Logo (vises på fakturaer)</Label>
+          <div className="flex items-center gap-3">
+            {logoPreview ? (
+              <img src={logoPreview} alt="Logo" className="h-12 w-auto max-w-[160px] object-contain border border-border/30 rounded bg-white p-1" />
+            ) : (
+              <div className="h-12 w-24 border border-dashed border-border/40 rounded flex items-center justify-center text-[10px] text-muted-foreground">Intet logo</div>
+            )}
+            <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={pickLogo} disabled={logoBusy}>
+              {logoBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImagePlus className="w-3 h-3" />}
+              {logoUrl ? "Skift logo" : "Upload logo"}
+            </Button>
+            {logoUrl && (
+              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={removeLogo} disabled={logoBusy}>
+                Fjern
+              </Button>
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground">PNG eller JPG, maks 1 MB.</p>
+        </div>
+
+        {/* Betalingsoplysninger */}
+        <div className="pt-2 border-t border-border/30 space-y-3">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Betalingsoplysninger (vises på fakturaer)</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bank reg.nr.</Label>
+              <Input value={bankReg} onChange={(e) => setBankReg(e.target.value)} className="h-8 text-sm bg-background font-mono" placeholder="fx 1234" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Kontonummer</Label>
+              <Input value={bankKonto} onChange={(e) => setBankKonto(e.target.value)} className="h-8 text-sm bg-background font-mono" placeholder="fx 1234567890" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">MobilePay</Label>
+              <Input value={mobilepay} onChange={(e) => setMobilepay(e.target.value)} className="h-8 text-sm bg-background font-mono" placeholder="nr. eller box" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Standard betalingsfrist (dage)</Label>
+              <Input type="number" value={defaultTerms} onChange={(e) => setDefaultTerms(e.target.value)} className="h-8 text-sm bg-background font-mono" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">IBAN</Label>
+              <Input value={iban} onChange={(e) => setIban(e.target.value)} className="h-8 text-sm bg-background font-mono" placeholder="DK00 0000 0000 0000 00" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">SWIFT/BIC</Label>
+              <Input value={swift} onChange={(e) => setSwift(e.target.value)} className="h-8 text-sm bg-background font-mono" />
+            </div>
+          </div>
+        </div>
+
         <Button size="sm" className="text-xs gap-2" onClick={save} disabled={saving || !company}>
           {saving && <Loader2 className="w-3 h-3 animate-spin" />}
           Gem ændringer

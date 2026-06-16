@@ -8,7 +8,13 @@ interface Line {
 }
 
 interface Args {
-  company: { name: string; cvr: string | null };
+  company: {
+    name: string; cvr: string | null;
+    bank_reg?: string | null; bank_konto?: string | null;
+    mobilepay?: string | null; iban?: string | null; swift?: string | null;
+    logo?: { bytes: Uint8Array; type: "png" | "jpg" } | null;
+    paymentTerms?: number | null;
+  };
   customer: { name: string; cvr: string | null; email: string | null; address: string | null };
   invoice: {
     number: number;
@@ -34,10 +40,26 @@ export async function generateInvoicePdf(args: Args): Promise<Uint8Array> {
   const muted = rgb(0.45, 0.45, 0.5);
   let y = 800;
 
+  // Logo (øverst til venstre) — ikke-fatal hvis embed fejler
+  let headerX = 50;
+  if (args.company.logo) {
+    try {
+      const img = args.company.logo.type === "png"
+        ? await pdf.embedPng(args.company.logo.bytes)
+        : await pdf.embedJpg(args.company.logo.bytes);
+      const maxH = 40;
+      const scale = Math.min(maxH / img.height, 120 / img.width);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      page.drawImage(img, { x: 50, y: y - h + 12, width: w, height: h });
+      headerX = 50 + w + 12;
+    } catch { /* uden logo */ }
+  }
+
   // Header
-  page.drawText(args.company.name, { x: 50, y, size: 16, font: bold, color: black });
+  page.drawText(args.company.name, { x: headerX, y, size: 16, font: bold, color: black });
   if (args.company.cvr) {
-    page.drawText(`CVR ${args.company.cvr}`, { x: 50, y: y - 16, size: 9, font, color: muted });
+    page.drawText(`CVR ${args.company.cvr}`, { x: headerX, y: y - 16, size: 9, font, color: muted });
   }
   page.drawText(`Faktura #${args.invoice.number}`, { x: 400, y, size: 14, font: bold, color: black });
   page.drawText(`Dato: ${args.invoice.date}`, { x: 400, y: y - 18, size: 9, font, color: muted });
@@ -84,6 +106,24 @@ export async function generateInvoicePdf(args: Args): Promise<Uint8Array> {
   y -= 16;
   page.drawText("Total", { x: 350, y, size: 11, font: bold, color: black });
   page.drawText(`${fmt(args.invoice.total)} kr.`, { x: 500, y, size: 11, font: bold, color: black });
+
+  // Betaling
+  const c = args.company;
+  const payLines: string[] = [];
+  if (c.bank_reg || c.bank_konto) payLines.push(`Bankoverførsel: Reg. ${c.bank_reg || "—"} Konto ${c.bank_konto || "—"}`);
+  if (c.mobilepay) payLines.push(`MobilePay: ${c.mobilepay}`);
+  if (c.iban || c.swift) payLines.push(`IBAN ${c.iban || "—"}${c.swift ? `  SWIFT/BIC ${c.swift}` : ""}`);
+  if (c.paymentTerms != null) payLines.push(`Betalingsbetingelser: netto ${c.paymentTerms} dage`);
+
+  if (payLines.length > 0) {
+    let py = 140;
+    page.drawText("Betaling", { x: 50, y: py, size: 9, font: bold, color: black });
+    py -= 14;
+    for (const line of payLines) {
+      page.drawText(line, { x: 50, y: py, size: 9, font, color: muted });
+      py -= 12;
+    }
+  }
 
   // Footer
   page.drawText("Tak for handlen.", { x: 50, y: 60, size: 9, font, color: muted });

@@ -221,35 +221,56 @@ export type Database = {
       }
       companies: {
         Row: {
+          bank_konto: string | null
+          bank_reg: string | null
           company_type: string
           created_at: string
           cvr: string | null
+          default_payment_terms: number
           fiscal_year_start: string
+          iban: string | null
           id: string
+          logo_url: string | null
+          mobilepay: string | null
           name: string
           owner_id: string
+          swift: string | null
           updated_at: string
           vat_period: string
         }
         Insert: {
+          bank_konto?: string | null
+          bank_reg?: string | null
           company_type?: string
           created_at?: string
           cvr?: string | null
+          default_payment_terms?: number
           fiscal_year_start?: string
+          iban?: string | null
           id?: string
+          logo_url?: string | null
+          mobilepay?: string | null
           name: string
           owner_id: string
+          swift?: string | null
           updated_at?: string
           vat_period?: string
         }
         Update: {
+          bank_konto?: string | null
+          bank_reg?: string | null
           company_type?: string
           created_at?: string
           cvr?: string | null
+          default_payment_terms?: number
           fiscal_year_start?: string
+          iban?: string | null
           id?: string
+          logo_url?: string | null
+          mobilepay?: string | null
           name?: string
           owner_id?: string
+          swift?: string | null
           updated_at?: string
           vat_period?: string
         }

@@ -72,6 +72,19 @@ export default function Faktura() {
     const d = new Date(); d.setDate(d.getDate() + 14);
     return d.toISOString().split("T")[0];
   });
+  const [dueDateTouched, setDueDateTouched] = useState(false);
+
+  // 3-niveau forfaldsfrist: kunde → virksomhed → 8 dage. Auto-udfyld forfald =
+  // fakturadato + frist, indtil brugeren selv retter datoen.
+  useEffect(() => {
+    if (dueDateTouched) return;
+    const cust = customers.find((c) => c.id === customerId);
+    const terms = cust?.default_payment_terms ?? company?.default_payment_terms ?? 8;
+    const d = new Date(invoiceDate);
+    if (isNaN(d.getTime())) return;
+    d.setDate(d.getDate() + terms);
+    setDueDate(d.toISOString().split("T")[0]);
+  }, [customerId, invoiceDate, customers, company, dueDateTouched]);
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: 1, description: "", quantity: 1, price: 0, vatRate: 25 },
   ]);
@@ -137,6 +150,7 @@ export default function Faktura() {
   const resetCreate = () => {
     setCustomerId("");
     setInvoiceDate(today);
+    setDueDateTouched(false);
     const d = new Date(); d.setDate(d.getDate() + 14);
     setDueDate(d.toISOString().split("T")[0]);
     setLines([{ id: 1, description: "", quantity: 1, price: 0, vatRate: 25 }]);
@@ -182,9 +196,27 @@ export default function Faktura() {
       }).select().single();
       if (error) throw error;
 
+      // Hent logo-bytes (hvis sat) til PDF'en — ikke-fatal hvis det fejler
+      let logo: { bytes: Uint8Array; type: "png" | "jpg" } | null = null;
+      if (company.logo_url) {
+        try {
+          const { data: blob } = await supabase.storage.from("branding").download(company.logo_url);
+          if (blob) {
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            logo = { bytes, type: company.logo_url.toLowerCase().endsWith(".png") ? "png" : "jpg" };
+          }
+        } catch { /* uden logo */ }
+      }
+      const custTerms = customer.default_payment_terms ?? company.default_payment_terms ?? 8;
+
       // Generate + upload PDF
       const pdfBytes = await generateInvoicePdf({
-        company: { name: company.name, cvr: company.cvr },
+        company: {
+          name: company.name, cvr: company.cvr,
+          bank_reg: company.bank_reg, bank_konto: company.bank_konto,
+          mobilepay: company.mobilepay, iban: company.iban, swift: company.swift,
+          logo, paymentTerms: custTerms,
+        },
         customer,
         invoice: { number: inv.number, date: invoiceDate, due_date: dueDate, lines, subtotal, totalVat, total },
       });
@@ -321,7 +353,7 @@ export default function Faktura() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Forfaldsdato</Label>
-                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-sm bg-background font-mono" />
+                  <Input type="date" value={dueDate} onChange={(e) => { setDueDate(e.target.value); setDueDateTouched(true); }} className="h-8 text-sm bg-background font-mono" />
                 </div>
               </div>
 
