@@ -21,15 +21,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Behold samme session-objekt når kun token fornyes (samme bruger). Ellers
+    // skifter `user`-referencen ved hvert tab-skift (Supabase forny-token), hvilket
+    // får afhængige hooks til at re-fetche og siden til at vise fuldskærms-loader
+    // (og tabe ugemte ændringer). Opdater kun state når bruger-id faktisk ændrer sig.
+    const apply = (next: Session | null) => {
+      setSession((prev) => {
+        const prevId = prev?.user?.id ?? null;
+        const nextId = next?.user?.id ?? null;
+        return prevId === nextId ? prev : next;
+      });
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setSession(session);
+        apply(session);
         setLoading(false);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      apply(session);
       setLoading(false);
     });
 

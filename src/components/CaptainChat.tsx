@@ -48,53 +48,15 @@ export function CaptainChat() {
 
       if (resp.status === 429) throw new Error("For mange forespørgsler. Prøv igen om lidt.");
       if (resp.status === 402) throw new Error("AI-credits opbrugt.");
-      if (!resp.ok || !resp.body) throw new Error("Kunne ikke kontakte Captain");
+      if (!resp.ok) throw new Error("Kunne ikke kontakte Captain");
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let assistantSoFar = "";
-      let streamDone = false;
-
-      // Add empty assistant placeholder
-      setMessages((p) => [...p, { role: "assistant", content: "" }]);
-
-      const upsert = (chunk: string) => {
-        assistantSoFar += chunk;
-        setMessages((prev) => {
-          const copy = [...prev];
-          copy[copy.length - 1] = { role: "assistant", content: assistantSoFar };
-          return copy;
-        });
-      };
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let nl: number;
-        while ((nl = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, nl);
-          textBuffer = textBuffer.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") { streamDone = true; break; }
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) upsert(c);
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
+      // captain-chat v2 svarer med JSON { content, structured_data } (ikke streaming)
+      const data = await resp.json();
+      if (data?.error) throw new Error(data.error);
+      setMessages((p) => [...p, { role: "assistant", content: data?.content || "" }]);
     } catch (err: any) {
       toast({ title: "Fejl", description: err.message, variant: "destructive" });
-      setMessages((p) => p.slice(0, -1));
+      // Behold brugerens besked; intet assistant-svar tilføjet ved fejl
     } finally {
       setLoading(false);
     }

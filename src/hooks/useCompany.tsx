@@ -38,7 +38,8 @@ export function useCompany() {
     }
 
     const fetchCompany = async () => {
-      setLoading(true);
+      // Vis kun loader ved første indlæsning — ikke ved en evt. baggrunds-refetch
+      setCompany((prev) => { if (!prev) setLoading(true); return prev; });
       const { data, error } = await supabase
         .from("companies")
         .select("*")
@@ -54,7 +55,9 @@ export function useCompany() {
     };
 
     fetchCompany();
-  }, [user, authLoading]);
+    // Keyet på user?.id (ikke user-objektet) så token-fornyelse ikke trigger refetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
 
   const refetch = async () => {
     if (!user) return;

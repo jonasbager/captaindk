@@ -29,7 +29,10 @@ import ResetPassword from "@/pages/ResetPassword";
 import Snap from "@/pages/Snap";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  // Undgå baggrunds-refetch (og loaders) når man skifter faneblad og kommer tilbage
+  defaultOptions: { queries: { refetchOnWindowFocus: false } },
+});
 
 function FullScreenLoader() {
   return (
