@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompany } from "@/hooks/useCompany";
 import { DocumentDetailDialog } from "@/components/DocumentDetailDialog";
 
 const emailAddress = "jonas.bager@bilag.captain.dk";
@@ -40,7 +41,9 @@ function formatRelative(iso: string | null): string {
 export default function Bilag() {
   const { toast } = useToast();
   const { session } = useAuth();
+  const { company } = useCompany();
   const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [connections, setConnections] = useState<Record<Provider, ConnectionState>>({
     gmail: initialConn,
     outlook: initialConn,
@@ -49,6 +52,42 @@ export default function Bilag() {
   const [connecting, setConnecting] = useState<Provider | null>(null);
   const [recentDocs, setRecentDocs] = useState<Array<{ id: string; vendor: string; date: string | null; status: string; source: string; ocr_status: string }>>([]);
   const [openDocId, setOpenDocId] = useState<string | null>(null);
+
+  const uploadFiles = useCallback(async (files: FileList | File[]) => {
+    if (!company) { toast({ title: "Ingen virksomhed", variant: "destructive" }); return; }
+    const list = Array.from(files).filter((f) => f.type.startsWith("image/") || f.type === "application/pdf");
+    if (list.length === 0) { toast({ title: "Kun billeder og PDF'er", variant: "destructive" }); return; }
+    setUploading(true);
+    let ok = 0;
+    for (const file of list) {
+      try {
+        const isPdf = file.type === "application/pdf";
+        const ext = isPdf ? "pdf" : (file.type === "image/png" ? "png" : "jpg");
+        const { data: doc, error: insErr } = await supabase.from("documents").insert({
+          company_id: company.id, source: "upload", status: "pending", ocr_status: "pending",
+          date: new Date().toISOString().slice(0, 10), mime_type: file.type,
+        }).select("id").single();
+        if (insErr || !doc) throw insErr || new Error("insert");
+        const path = `${company.id}/${doc.id}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { contentType: file.type, upsert: true });
+        if (upErr) throw upErr;
+        await supabase.from("documents").update({ storage_path: path, file_url: `upload:${doc.id}` }).eq("id", doc.id);
+        supabase.functions.invoke("extract-receipt", { body: { document_id: doc.id } }).catch(() => {});
+        ok++;
+      } catch { /* spring fejlende fil over */ }
+    }
+    setUploading(false);
+    toast({ title: ok > 0 ? "Uploadet" : "Upload fejlede", description: ok > 0 ? `${ok} bilag behandles nu — se dem i Indbakke.` : "Prøv igen.", variant: ok > 0 ? undefined : "destructive" });
+  }, [company, toast]);
+
+  const pickFiles = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*,application/pdf";
+    input.multiple = true;
+    input.onchange = () => { if (input.files?.length) uploadFiles(input.files); };
+    input.click();
+  };
 
   const loadDocs = useCallback(() => {
     supabase
@@ -259,16 +298,23 @@ export default function Bilag() {
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-        className={`border-2 border-dashed rounded p-12 text-center transition-colors ${
-          dragOver ? "border-primary bg-primary/5" : "border-border/40"
+        role="button"
+        tabIndex={0}
+        className={`border-2 border-dashed rounded p-12 text-center transition-colors cursor-pointer ${
+          dragOver ? "border-primary bg-primary/5" : "border-border/40 hover:border-border/60"
         }`}
+        onClick={() => !uploading && pickFiles()}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); }}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files); }}
       >
-        <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground mb-1">Træk filer hertil eller klik for at uploade</p>
-        <p className="text-xs text-muted-foreground">Billeder, PDF'er — multiple filer ad gangen</p>
+        {uploading ? (
+          <Loader2 className="h-8 w-8 text-muted-foreground mx-auto mb-3 animate-spin" />
+        ) : (
+          <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        )}
+        <p className="text-sm text-muted-foreground mb-1">{uploading ? "Uploader…" : "Træk filer hertil eller klik for at uploade"}</p>
+        <p className="text-xs text-muted-foreground">Billeder, PDF'er — flere filer ad gangen</p>
       </motion.div>
 
       <DocumentDetailDialog

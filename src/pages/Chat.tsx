@@ -8,7 +8,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
 import { MessageCard, type StructuredCardData } from "@/components/MessageCard";
-import { formatAmount } from "@/lib/format";
+import { formatAmount, stripMarkdown } from "@/lib/format";
 
 interface Msg {
   id?: string;
@@ -158,7 +158,7 @@ export default function Chat() {
                           ? "bg-primary/10 text-foreground rounded-lg px-3 py-2"
                           : ""
                       }`}>
-                        {m.content || (loading && i === messages.length - 1 ? <Loader2 className="h-3 w-3 animate-spin inline" /> : null)}
+                        {m.content ? stripMarkdown(m.content) : (loading && i === messages.length - 1 ? <Loader2 className="h-3 w-3 animate-spin inline" /> : null)}
                       </div>
                     )}
                     {m.structured_data && (

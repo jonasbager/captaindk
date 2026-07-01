@@ -175,13 +175,14 @@ export default function Faktura() {
 
   const saveCustomer = async () => {
     if (!company || !cName.trim()) return;
-    const { error } = await supabase.from("customers").insert({
+    const { data, error } = await supabase.from("customers").insert({
       company_id: company.id, name: cName, cvr: cCvr || null, email: cEmail || null, address: cAddress || null, default_payment_terms: cTerms,
-    });
+    }).select("id").single();
     if (error) return toast({ title: "Fejl", description: error.message, variant: "destructive" });
     setCName(""); setCCvr(""); setCEmail(""); setCAddress(""); setCTerms(14);
     setShowCustomer(false);
-    refetch();
+    await refetch();
+    if (data?.id) setCustomerId(data.id); // vælg den nye kunde direkte i fakturaen
     toast({ title: "Kunde oprettet" });
   };
 
@@ -213,17 +214,7 @@ export default function Faktura() {
       }).select().single();
       if (error) throw error;
 
-      // Hent logo-bytes (hvis sat) til PDF'en — ikke-fatal hvis det fejler
-      let logo: { bytes: Uint8Array; type: "png" | "jpg" } | null = null;
-      if (company.logo_url) {
-        try {
-          const { data: blob } = await supabase.storage.from("branding").download(company.logo_url);
-          if (blob) {
-            const bytes = new Uint8Array(await blob.arrayBuffer());
-            logo = { bytes, type: company.logo_url.toLowerCase().endsWith(".png") ? "png" : "jpg" };
-          }
-        } catch { /* uden logo */ }
-      }
+      const logo = await fetchLogo();
       const custTerms = customer.default_payment_terms ?? company.default_payment_terms ?? 8;
 
       // Generate + upload PDF
@@ -325,6 +316,44 @@ export default function Faktura() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
+  const fetchLogo = async (): Promise<{ bytes: Uint8Array; type: "png" | "jpg" } | null> => {
+    if (!company?.logo_url) return null;
+    try {
+      const { data: blob } = await supabase.storage.from("branding").download(company.logo_url);
+      if (!blob) return null;
+      return { bytes: new Uint8Array(await blob.arrayBuffer()), type: company.logo_url.toLowerCase().endsWith(".png") ? "png" : "jpg" };
+    } catch { return null; }
+  };
+
+  // Preview uden at gemme: generér PDF fra det aktuelle udkast og åbn i ny fane
+  const previewInvoice = async () => {
+    if (!company) return;
+    const customer = customers.find((c) => c.id === customerId);
+    if (!customer) return toast({ title: "Vælg en kunde", variant: "destructive" });
+    setBusy(true);
+    try {
+      const logo = await fetchLogo();
+      const custTerms = customer.default_payment_terms ?? company.default_payment_terms ?? 8;
+      const pdfBytes = await generateInvoicePdf({
+        company: {
+          name: company.name, cvr: company.cvr,
+          bank_reg: company.bank_reg, bank_konto: company.bank_konto,
+          mobilepay: company.mobilepay, iban: company.iban, swift: company.swift,
+          logo, paymentTerms: custTerms, paymentMethods: selectedMethods,
+        },
+        customer,
+        invoice: { number: nextNumber, date: invoiceDate, due_date: dueDate, lines, subtotal, totalVat, total },
+      });
+      const url = URL.createObjectURL(new Blob([pdfBytes], { type: "application/pdf" }));
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e: any) {
+      toast({ title: "Kunne ikke lave preview", description: e.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <Tabs defaultValue="invoices">
@@ -353,12 +382,11 @@ export default function Faktura() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Kunde</Label>
-                  <Select value={customerId} onValueChange={setCustomerId}>
+                  <Select value={customerId} onValueChange={(v) => v === "__new__" ? setShowCustomer(true) : setCustomerId(v)}>
                     <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Vælg kunde" /></SelectTrigger>
                     <SelectContent>
-                      {customers.length === 0 ? (
-                        <div className="text-xs text-muted-foreground p-2">Ingen kunder. Opret én under fanen Kunder.</div>
-                      ) : customers.map((c) => (
+                      <SelectItem value="__new__" className="text-primary">+ Ny kunde</SelectItem>
+                      {customers.map((c) => (
                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -381,8 +409,8 @@ export default function Faktura() {
                 {lines.map((line) => (
                   <div key={line.id} className="grid grid-cols-[1fr_80px_100px_80px_32px] gap-2">
                     <Input value={line.description} onChange={(e) => updateLine(line.id, "description", e.target.value)} placeholder="Beskrivelse..." className="h-8 text-sm bg-background" />
-                    <Input type="number" value={line.quantity} onChange={(e) => updateLine(line.id, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-sm bg-background font-mono" />
-                    <Input type="number" value={line.price} onChange={(e) => updateLine(line.id, "price", parseFloat(e.target.value) || 0)} className="h-8 text-sm bg-background font-mono" />
+                    <Input type="number" value={line.quantity || ""} placeholder="1" onChange={(e) => updateLine(line.id, "quantity", parseFloat(e.target.value) || 0)} className="h-8 text-sm bg-background font-mono" />
+                    <Input type="number" value={line.price || ""} placeholder="0,00" onChange={(e) => updateLine(line.id, "price", parseFloat(e.target.value) || 0)} className="h-8 text-sm bg-background font-mono" />
                     <Select value={String(line.vatRate)} onValueChange={(v) => updateLine(line.id, "vatRate", parseInt(v))}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -440,6 +468,9 @@ export default function Faktura() {
 
               <div className="flex gap-3 justify-end">
                 <Button size="sm" variant="outline" className="text-xs" onClick={resetCreate} disabled={busy}>Annuller</Button>
+                <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={previewInvoice} disabled={busy}>
+                  <FileText className="h-3 w-3" /> Preview
+                </Button>
                 <Button size="sm" variant="outline" className="text-xs" onClick={() => saveInvoice("kladde")} disabled={busy}>Gem kladde</Button>
                 <Button size="sm" className="text-xs gap-1.5" onClick={() => saveInvoice("sendt")} disabled={busy}>
                   {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />} Gem og send

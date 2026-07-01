@@ -19,6 +19,10 @@ export const formatAmount = (amount: number, currency: string | null = "DKK"): s
   return `${num} ${symbol}`;
 };
 
+// Fjern markdown-fremhævning (**, __, `) fra AI-svar, så det vises rent i chatten.
+export const stripMarkdown = (text: string): string =>
+  text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/__(.*?)__/g, "$1").replace(/`(.*?)`/g, "$1");
+
 export const formatAmountShort = (amount: number, currency: string | null = "DKK"): string => {
   const cur = (currency || "DKK").toUpperCase();
   const num = amount.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });

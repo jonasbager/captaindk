@@ -1,9 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Loader2 } from "lucide-react";
 import { formatAmountShort } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+
+const kindOptions: { value: string; label: string; taxLine: string }[] = [
+  { value: "revenue", label: "Indtægt", taxLine: "nettoomsaetning" },
+  { value: "expense", label: "Udgift", taxLine: "andre_driftsomkostninger" },
+  { value: "asset", label: "Aktiv", taxLine: "omsaetningsaktiver" },
+  { value: "liability", label: "Passiv / gæld", taxLine: "anden_gaeld" },
+  { value: "equity", label: "Egenkapital", taxLine: "egenkapital" },
+];
 
 interface AccountRow {
   id: string;
@@ -39,23 +53,54 @@ const groupDefs: { range: string; label: string; from: number; to: number }[] = 
 
 export default function Kontoplan() {
   const { company } = useCompany();
+  const { toast } = useToast();
   const [openGroups, setOpenGroups] = useState<string[]>(groupDefs.map((g) => g.range));
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [nNumber, setNNumber] = useState("");
+  const [nName, setNName] = useState("");
+  const [nKind, setNKind] = useState("expense");
+  const [nVat, setNVat] = useState("I25");
+
+  const loadAccounts = useCallback(async () => {
+    if (!company) return;
+    const { data } = await supabase
+      .from("accounts").select("id, number, name, kind, vat_code, tax_line")
+      .eq("company_id", company.id).order("number");
+    if (data) setAccounts(data as AccountRow[]);
+    setLoaded(true);
+  }, [company]);
+
+  const addAccount = async () => {
+    if (!company) return;
+    const num = parseInt(nNumber, 10);
+    if (!num || num < 1000 || num > 6999) {
+      toast({ title: "Ugyldigt kontonummer", description: "Vælg et nummer mellem 1000 og 6999.", variant: "destructive" });
+      return;
+    }
+    if (!nName.trim()) { toast({ title: "Kontonavn mangler", variant: "destructive" }); return; }
+    if (accounts.some((a) => a.number === num)) {
+      toast({ title: "Kontonummer findes allerede", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const taxLine = kindOptions.find((k) => k.value === nKind)?.taxLine ?? null;
+    const { error } = await supabase.from("accounts").insert({
+      company_id: company.id, number: num, name: nName.trim(), kind: nKind, vat_code: nVat, tax_line: taxLine,
+    });
+    setSaving(false);
+    if (error) { toast({ title: "Kunne ikke oprette konto", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Konto oprettet", description: `${num} ${nName.trim()}` });
+    setNNumber(""); setNName(""); setShowAdd(false);
+    loadAccounts();
+  };
 
   useEffect(() => {
     if (!company) return;
-
-    supabase
-      .from("accounts")
-      .select("id, number, name, kind, vat_code, tax_line")
-      .eq("company_id", company.id)
-      .order("number")
-      .then(({ data }) => {
-        if (data) setAccounts(data as AccountRow[]);
-        setLoaded(true);
-      });
+    loadAccounts();
 
     supabase
       .from("journal_entries")
@@ -84,9 +129,46 @@ export default function Kontoplan() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-4">
-      <motion.h1 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-lg font-semibold">
-        Kontoplan
-      </motion.h1>
+      <div className="flex items-center justify-between">
+        <motion.h1 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-lg font-semibold">
+          Kontoplan
+        </motion.h1>
+        <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowAdd(true)} disabled={!company}>
+          <Plus className="h-3 w-3" /> Ny konto
+        </Button>
+      </div>
+
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="text-base">Ny konto</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Kontonummer (1000–6999)</Label><Input value={nNumber} onChange={(e) => setNNumber(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="fx 3625" className="h-8 text-sm font-mono" /></div>
+              <div>
+                <Label className="text-xs">Type</Label>
+                <Select value={nKind} onValueChange={setNKind}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>{kindOptions.map((k) => <SelectItem key={k.value} value={k.value} className="text-sm">{k.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div><Label className="text-xs">Kontonavn</Label><Input value={nName} onChange={(e) => setNName(e.target.value)} className="h-8 text-sm" /></div>
+            <div>
+              <Label className="text-xs">Momskode</Label>
+              <Select value={nVat} onValueChange={setNVat}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(vatCodeLabels).map(([code, label]) => <SelectItem key={code} value={code} className="text-sm">{code} — {label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="outline" onClick={() => setShowAdd(false)}>Annuller</Button>
+            <Button size="sm" onClick={addAccount} disabled={saving} className="gap-1.5">
+              {saving && <Loader2 className="h-3 w-3 animate-spin" />}Opret konto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {loaded && accounts.length === 0 && (
         <div className="border border-border/50 rounded bg-card p-6 text-center">

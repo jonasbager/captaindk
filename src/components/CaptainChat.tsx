@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { SUPABASE_URL } from "@/integrations/supabase/client";
+import { stripMarkdown } from "@/lib/format";
 
 interface Msg {
   role: "user" | "assistant";
@@ -103,7 +104,7 @@ export function CaptainChat() {
                       : "mr-6 text-foreground"
                   }`}
                 >
-                  {m.content || (loading && i === messages.length - 1 ? <Loader2 className="h-3 w-3 animate-spin inline" /> : null)}
+                  {m.content ? stripMarkdown(m.content) : (loading && i === messages.length - 1 ? <Loader2 className="h-3 w-3 animate-spin inline" /> : null)}
                 </div>
               ))}
             </div>

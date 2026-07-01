@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useToast } from "@/hooks/use-toast";
 
-interface JournalEntry {
+interface Row {
   id: string;
   date: string;
   description: string;
@@ -20,18 +20,20 @@ interface JournalEntry {
   account_number: number | null;
   status: string;
   has_document: boolean;
+  kind: "je" | "tx"; // je = bogført postering, tx = importeret banktransaktion (ikke bogført)
 }
 
 const statusColors: Record<string, string> = {
   godkendt: "bg-primary/15 text-primary border-primary/20",
   "ai-forslag": "bg-info/15 text-info border-info/20",
   afventer: "bg-warning/15 text-warning border-warning/20",
+  importeret: "bg-muted text-muted-foreground border-border/40",
 };
 
 export default function Posteringer() {
   const { company } = useCompany();
   const { toast } = useToast();
-  const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
+  const [allEntries, setAllEntries] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("alle");
@@ -42,12 +44,33 @@ export default function Posteringer() {
 
   const load = useCallback(async () => {
     if (!company) return;
-    const { data } = await supabase
-      .from("journal_entries")
-      .select("id, date, description, amount, account, account_number, status, has_document")
-      .eq("company_id", company.id)
-      .order("date", { ascending: false });
-    if (data) setAllEntries(data as JournalEntry[]);
+    const [je, tx] = await Promise.all([
+      supabase
+        .from("journal_entries")
+        .select("id, date, description, amount, account, account_number, status, has_document")
+        .eq("company_id", company.id)
+        .order("date", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select("id, date, description, amount, matched_document_id")
+        .eq("company_id", company.id)
+        .order("date", { ascending: false }),
+    ]);
+    const jeRows: Row[] = (je.data || []).map((e: any) => ({ ...e, kind: "je" as const }));
+    // Importerede/synkede banktransaktioner vises som "ikke bogført" (skrivebeskyttet her)
+    const txRows: Row[] = (tx.data || []).map((t: any) => ({
+      id: `tx-${t.id}`,
+      date: t.date,
+      description: t.description,
+      amount: Number(t.amount),
+      account: "—",
+      account_number: null,
+      status: "importeret",
+      has_document: !!t.matched_document_id,
+      kind: "tx" as const,
+    }));
+    const merged = [...jeRows, ...txRows].sort((a, b) => (a.date < b.date ? 1 : -1));
+    setAllEntries(merged);
     setLoading(false);
   }, [company]);
 
@@ -69,11 +92,13 @@ export default function Posteringer() {
     });
   };
 
+  const selectable = filtered.filter((e) => e.kind === "je");
+
   const toggleAll = () => {
-    if (checkedIds.size === filtered.length) {
+    if (checkedIds.size === selectable.length) {
       setCheckedIds(new Set());
     } else {
-      setCheckedIds(new Set(filtered.map((e) => e.id)));
+      setCheckedIds(new Set(selectable.map((e) => e.id)));
     }
   };
 
@@ -103,8 +128,9 @@ export default function Posteringer() {
     }
   };
 
-  const totalCount = allEntries.length;
-  const pendingCount = allEntries.filter((e) => e.status !== "godkendt").length;
+  const jeCount = allEntries.filter((e) => e.kind === "je").length;
+  const txCount = allEntries.filter((e) => e.kind === "tx").length;
+  const pendingCount = allEntries.filter((e) => e.kind === "je" && e.status !== "godkendt").length;
   const selectedEntry = allEntries.find((e) => e.id === selected);
 
   if (loading) {
@@ -123,7 +149,8 @@ export default function Posteringer() {
             <div>
               <h1 className="text-lg font-semibold">Posteringer</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {totalCount} posteringer i alt · <span className="text-warning">{pendingCount} venter på godkendelse</span>
+                {jeCount} posteringer · <span className="text-warning">{pendingCount} venter på godkendelse</span>
+                {txCount > 0 && <> · {txCount} importerede transaktioner (ikke bogført)</>}
               </p>
             </div>
             {checkedIds.size > 0 && (
@@ -160,6 +187,7 @@ export default function Posteringer() {
                 <SelectItem value="godkendt">Godkendt</SelectItem>
                 <SelectItem value="ai-forslag">AI-forslag</SelectItem>
                 <SelectItem value="afventer">Afventer</SelectItem>
+                <SelectItem value="importeret">Importeret (bank)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -177,7 +205,7 @@ export default function Posteringer() {
               <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-border/30 text-xs text-muted-foreground">
                   <th className="p-3 w-8">
-                    <Checkbox checked={checkedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
+                    <Checkbox checked={checkedIds.size === selectable.length && selectable.length > 0} onCheckedChange={toggleAll} />
                   </th>
                   <th className="text-left p-3 font-medium">Dato</th>
                   <th className="text-left p-3 font-medium">Beskrivelse</th>
@@ -200,7 +228,9 @@ export default function Posteringer() {
                     }`}
                   >
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox checked={checkedIds.has(entry.id)} onCheckedChange={() => toggleCheck(entry.id)} />
+                      {entry.kind === "je" && (
+                        <Checkbox checked={checkedIds.has(entry.id)} onCheckedChange={() => toggleCheck(entry.id)} />
+                      )}
                     </td>
                     <td className="p-3 font-mono text-xs text-muted-foreground">{entry.date}</td>
                     <td className="p-3">{entry.description}</td>
